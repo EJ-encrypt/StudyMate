@@ -11,13 +11,23 @@ architecture decisions.
 
 ```bash
 cp .env.example .env
+```
+
+Then set `GEMINI_API_KEY` in `.env` to a free Google AI Studio key
+(https://aistudio.google.com/apikey, no billing required) so concept
+extraction works.
+
+```bash
 docker compose up --build
 ```
 
 - Backend: http://localhost:8000 (docs at `/docs`)
 - Frontend: http://localhost:5173
 
-The backend container runs Alembic migrations on startup.
+The backend container runs Alembic migrations on startup. A separate
+`worker` container runs the RQ job that extracts concepts from uploaded
+PDFs, so both `backend` and `worker` need to be up for uploads to finish
+processing.
 
 ## Running tests
 

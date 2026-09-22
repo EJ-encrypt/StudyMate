@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import auth
+from app.api.routers import auth, courses, documents
 from app.core.config import settings
 
 app = FastAPI(title="StudyMate AI API")
@@ -15,6 +15,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(courses.router)
+app.include_router(documents.router)
 
 
 @app.get("/health")
