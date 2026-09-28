@@ -4,3 +4,9 @@
 from app.models.user import User  # noqa: F401
 from app.models.course import Course, Enrollment  # noqa: F401
 from app.models.document import KnowledgeConcept, LectureDocument  # noqa: F401
+from app.models.assessment import (  # noqa: F401
+    Assessment,
+    AssessmentItem,
+    Attempt,
+    AttemptAnswer,
+)

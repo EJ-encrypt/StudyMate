@@ -6,6 +6,7 @@ import Coach from "./pages/Coach";
 import Login from "./pages/Login";
 import Materials from "./pages/Materials";
 import Profile from "./pages/Profile";
+import Quiz from "./pages/Quiz";
 import Register from "./pages/Register";
 import Upload from "./pages/Upload";
 
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/materials" element={<Materials />} />
           <Route path="/coach" element={<Coach />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/quiz/:assessmentId" element={<Quiz />} />
         </Route>
         <Route path="/" element={<Navigate to="/upload" replace />} />
       </Routes>

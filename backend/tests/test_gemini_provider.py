@@ -4,7 +4,12 @@ import pytest
 import requests
 from google.genai import errors
 
-from app.services.ai.gemini_provider import _MODELS, GeminiProvider
+from app.services.ai.gemini_provider import (
+    _MODELS,
+    GeminiProvider,
+    _ConceptList,
+    _ItemList,
+)
 
 
 def _api_error(code: int) -> errors.APIError:
@@ -89,6 +94,32 @@ def test_does_not_retry_permanent_error(provider: GeminiProvider) -> None:
 
     assert generate.call_count == 1
     sleep.assert_not_called()
+
+
+def test_response_schemas_carry_no_defaults() -> None:
+    """Gemini rejects a response schema containing default values.
+
+    Guards against a field gaining a default and silently breaking every
+    generation call at runtime.
+    """
+
+    def defaults_in(schema: dict, path: str = "") -> list[str]:
+        found = []
+        for key, value in schema.items():
+            if key == "default":
+                found.append(path or "<root>")
+            elif isinstance(value, dict):
+                found.extend(defaults_in(value, f"{path}.{key}" if path else key))
+            elif isinstance(value, list):
+                for index, entry in enumerate(value):
+                    if isinstance(entry, dict):
+                        found.extend(defaults_in(entry, f"{path}.{key}[{index}]"))
+        return found
+
+    for schema_model in (_ConceptList, _ItemList):
+        assert defaults_in(schema_model.model_json_schema()) == [], (
+            f"{schema_model.__name__} has defaults; Gemini will reject it"
+        )
 
 
 def test_caps_concepts_at_requested_maximum(provider: GeminiProvider) -> None:
