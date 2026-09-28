@@ -16,7 +16,11 @@ down_revision: Union[str, None] = "0001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-document_status = postgresql.ENUM("pending", "processing", "completed", "failed", name="document_status")
+# create_type=False: the type is created explicitly in upgrade(); without this
+# create_table() would emit a second CREATE TYPE and fail with DuplicateObject.
+document_status = postgresql.ENUM(
+    "pending", "processing", "completed", "failed", name="document_status", create_type=False
+)
 
 
 def upgrade() -> None:

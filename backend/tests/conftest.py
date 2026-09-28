@@ -1,6 +1,8 @@
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.models  # noqa: F401 -- registers all models on Base.metadata
@@ -10,7 +12,30 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 
-engine = create_engine(settings.database_url)
+# Tests run against a dedicated <dbname>_test database: the fixtures below
+# truncate between tests and drop every table at the end, which would
+# otherwise destroy the schema of the database the app is running on.
+_app_url = make_url(settings.database_url)
+_test_url = _app_url.set(database=f"{_app_url.database}_test")
+
+
+def _ensure_test_database() -> None:
+    admin_engine = create_engine(_app_url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin_engine.connect() as conn:
+            exists = conn.execute(
+                sa.text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": _test_url.database},
+            ).scalar()
+            if not exists:
+                conn.execute(sa.text(f'CREATE DATABASE "{_test_url.database}"'))
+    finally:
+        admin_engine.dispose()
+
+
+_ensure_test_database()
+
+engine = create_engine(_test_url)
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

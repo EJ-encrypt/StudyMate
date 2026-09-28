@@ -5,9 +5,10 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.services.ai.base import AIProvider, ExtractedConcept
 
-# gemini-2.5-flash is on Google AI Studio's free tier (no billing required).
-# Swapping to a newer free-tier Flash model is a one-line change here.
-_MODEL = "gemini-2.5-flash"
+# Free-tier Flash model on Google AI Studio (no billing required). Google
+# retires these periodically -- gemini-2.5-flash was closed to new keys and the
+# API itself pointed here. `client.models.list()` shows what a key can reach.
+_MODEL = "gemini-3.8-flash"
 _MAX_INPUT_CHARS = 20000
 
 

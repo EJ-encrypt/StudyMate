@@ -46,6 +46,20 @@ def test_login_rejects_wrong_password(client: TestClient) -> None:
     assert login_response.status_code == 401
 
 
+def test_register_rejects_passwords_bcrypt_cannot_hash(client: TestClient) -> None:
+    too_short = client.post(
+        "/auth/register",
+        json={"email": "short@example.com", "password": "abc", "full_name": "Test Student"},
+    )
+    assert too_short.status_code == 422
+
+    too_long = client.post(
+        "/auth/register",
+        json={"email": "long@example.com", "password": "x" * 73, "full_name": "Test Student"},
+    )
+    assert too_long.status_code == 422
+
+
 def test_me_requires_and_returns_current_user(client: TestClient) -> None:
     client.post(
         "/auth/register",

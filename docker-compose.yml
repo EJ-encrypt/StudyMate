@@ -26,8 +26,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://studymate:studymate@postgres:5432/studymate
       REDIS_URL: redis://redis:6379/0
+    # Host port 9000: 8000 falls inside a Windows-reserved TCP exclusion range
+    # (netsh interface ipv4 show excludedportrange) and cannot be bound there.
     ports:
-      - "8000:8000"
+      - "9000:8000"
     volumes:
       - ./backend:/app
     depends_on:

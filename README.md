@@ -21,7 +21,7 @@ extraction works.
 docker compose up --build
 ```
 
-- Backend: http://localhost:8000 (docs at `/docs`)
+- Backend: http://localhost:9000 (docs at `/docs`)
 - Frontend: http://localhost:5173
 
 The backend container runs Alembic migrations on startup. A separate
@@ -31,14 +31,14 @@ processing.
 
 ## Running tests
 
-Backend (requires Postgres reachable at `DATABASE_URL`, e.g. via
-`docker compose up postgres -d`):
+Backend, with the stack already up:
 
 ```bash
-cd backend
-pip install -r requirements.txt
-pytest
+docker compose exec backend pytest
 ```
+
+The suite creates and uses a separate `studymate_test` database, so it
+never touches the data in your dev database.
 
 Frontend:
 

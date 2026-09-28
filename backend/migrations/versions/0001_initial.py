@@ -16,7 +16,9 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-user_role = postgresql.ENUM("student", "lecturer", name="user_role")
+# create_type=False: the type is created explicitly in upgrade(); without this
+# create_table() would emit a second CREATE TYPE and fail with DuplicateObject.
+user_role = postgresql.ENUM("student", "lecturer", name="user_role", create_type=False)
 
 
 def upgrade() -> None:
