@@ -42,3 +42,16 @@ export async function uploadDocument(courseId: string, file: File): Promise<Docu
   });
   return data;
 }
+
+export async function createNotes(
+  courseId: string,
+  title: string,
+  content: string,
+): Promise<DocumentSummary> {
+  const { data } = await apiClient.post<DocumentSummary>("/documents/notes", {
+    course_id: courseId,
+    title,
+    content,
+  });
+  return data;
+}

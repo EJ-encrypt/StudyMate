@@ -4,6 +4,9 @@ An AI-powered personalized learning assistant: upload lecture materials,
 get key concepts extracted automatically, generate flashcards/quizzes/exams,
 and track per-student mastery with an AI Study Coach.
 
+Ingestion accepts PDF, DOCX, PPTX, and plain text/Markdown files, plus
+notes typed straight into the app.
+
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for full scope, tech stack, and
 architecture decisions.
 

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -42,7 +43,27 @@ def test_upload_document_enqueues_extraction_job(client: TestClient, tmp_path) -
     assert len(list_response.json()) == 1
 
 
-def test_upload_rejects_non_pdf(client: TestClient) -> None:
+@pytest.mark.parametrize("filename", ["lecture.pdf", "lecture.docx", "slides.pptx", "notes.txt", "notes.md"])
+def test_upload_accepts_every_supported_format(client: TestClient, tmp_path, filename: str) -> None:
+    token = _register_and_login(client, f"fmt-{filename.replace('.', '-')}@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "Networks", "code": "CS401"}, headers=headers).json()
+
+    with patch("app.api.routers.documents.settings.storage_dir", str(tmp_path)), patch(
+        "app.api.routers.documents.queue.enqueue"
+    ):
+        response = client.post(
+            "/documents",
+            headers=headers,
+            data={"course_id": course["id"]},
+            files={"file": (filename, b"file bytes", "application/octet-stream")},
+        )
+
+    assert response.status_code == 201
+    assert response.json()["filename"] == filename
+
+
+def test_upload_rejects_unsupported_format(client: TestClient) -> None:
     token = _register_and_login(client, "non-pdf-uploader@example.com")
     headers = {"Authorization": f"Bearer {token}"}
     course = client.post("/courses", json={"name": "Networks", "code": "CS401"}, headers=headers).json()
@@ -51,9 +72,73 @@ def test_upload_rejects_non_pdf(client: TestClient) -> None:
         "/documents",
         headers=headers,
         data={"course_id": course["id"]},
-        files={"file": ("notes.txt", b"plain text", "text/plain")},
+        files={"file": ("lecture.mp3", b"audio", "audio/mpeg")},
     )
     assert response.status_code == 400
+
+
+def test_upload_strips_path_traversal_from_filename(client: TestClient, tmp_path) -> None:
+    token = _register_and_login(client, "traversal@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "Networks", "code": "CS401"}, headers=headers).json()
+
+    with patch("app.api.routers.documents.settings.storage_dir", str(tmp_path)), patch(
+        "app.api.routers.documents.queue.enqueue"
+    ):
+        response = client.post(
+            "/documents",
+            headers=headers,
+            data={"course_id": course["id"]},
+            files={"file": ("../../../evil.pdf", b"%PDF-1.4", "application/pdf")},
+        )
+
+    assert response.status_code == 201
+    assert response.json()["filename"] == "evil.pdf"
+    written = list(tmp_path.rglob("*evil.pdf"))
+    assert len(written) == 1
+    assert tmp_path in written[0].parents
+
+
+def test_create_typed_notes(client: TestClient, tmp_path) -> None:
+    token = _register_and_login(client, "notes-writer@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "Networks", "code": "CS401"}, headers=headers).json()
+
+    with patch("app.api.routers.documents.settings.storage_dir", str(tmp_path)), patch(
+        "app.api.routers.documents.queue.enqueue"
+    ) as mock_enqueue:
+        response = client.post(
+            "/documents/notes",
+            headers=headers,
+            json={
+                "course_id": course["id"],
+                "title": "Week 5 - Normalization",
+                "content": "A candidate key is a minimal determinant of every attribute.",
+            },
+        )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["filename"] == "Week 5 - Normalization.txt"
+    assert body["status"] == "pending"
+    mock_enqueue.assert_called_once()
+
+    saved = list(tmp_path.rglob("*.txt"))
+    assert len(saved) == 1
+    assert "candidate key" in saved[0].read_text(encoding="utf-8")
+
+
+def test_create_notes_rejects_empty_content(client: TestClient) -> None:
+    token = _register_and_login(client, "empty-notes@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "Networks", "code": "CS401"}, headers=headers).json()
+
+    response = client.post(
+        "/documents/notes",
+        headers=headers,
+        json={"course_id": course["id"], "title": "Empty", "content": ""},
+    )
+    assert response.status_code == 422
 
 
 def test_upload_rejects_course_owned_by_another_student(client: TestClient) -> None:

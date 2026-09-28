@@ -1,9 +1,15 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.document import DocumentStatus
+
+
+class NotesCreate(BaseModel):
+    course_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=200_000)
 
 
 class DocumentRead(BaseModel):

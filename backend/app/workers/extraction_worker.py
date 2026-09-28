@@ -3,7 +3,7 @@ import uuid
 from app.db.session import SessionLocal
 from app.models.document import DocumentStatus, KnowledgeConcept, LectureDocument
 from app.services.ai import get_ai_provider
-from app.services.extraction.pdf import extract_text_from_pdf
+from app.services.extraction import extract_text
 
 
 def process_document(document_id: str) -> None:
@@ -17,7 +17,9 @@ def process_document(document_id: str) -> None:
         db.commit()
 
         try:
-            text = extract_text_from_pdf(document.storage_path)
+            text = extract_text(document.storage_path)
+            if not text.strip():
+                raise ValueError("No readable text found in this document")
             concepts = get_ai_provider().extract_concepts(text)
         except Exception as exc:  # noqa: BLE001 -- surfaced to the student via document.error_message
             document.status = DocumentStatus.FAILED

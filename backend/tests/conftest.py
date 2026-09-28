@@ -33,21 +33,22 @@ def _ensure_test_database() -> None:
         admin_engine.dispose()
 
 
-_ensure_test_database()
-
+# create_engine does not connect, so tests that never touch the database
+# (extraction, for one) still run without Postgres available.
 engine = create_engine(_test_url)
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def _create_schema():
+    _ensure_test_database()
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture()
-def db() -> Session:
+def db(_create_schema) -> Session:
     session = TestSessionLocal()
     try:
         yield session
