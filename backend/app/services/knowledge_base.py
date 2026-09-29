@@ -68,15 +68,30 @@ def sync_document_concepts(db: Session, document_id: uuid.UUID) -> None:
     )
 
     provider = get_ai_provider()
-    vectors = provider.embed([render_for_embedding(c.name, c.summary) for c in pending])
+    vectors, embedding_model = provider.embed_tagged(
+        [render_for_embedding(c.name, c.summary) for c in pending]
+    )
 
     # Work out the best existing match for each incoming concept first, so the
     # ambiguous ones can be adjudicated together in a single call.
+    # Only vectors from the same embedding model are comparable. When a
+    # fallback provider produced this batch, existing concepts embedded by the
+    # primary are simply not candidates - which can leave a duplicate, the safe
+    # direction, rather than merging on a meaningless similarity score.
+    comparable = [c for c in existing if c.embedding_model == embedding_model]
+    if len(comparable) != len(existing):
+        logger.info(
+            "%s of %s existing concepts share the current embedding model; the rest "
+            "cannot be compared",
+            len(comparable),
+            len(existing),
+        )
+
     best_matches: list[tuple[KnowledgeConcept, list[float], CourseConcept | None, float]] = []
     for concept, vector in zip(pending, vectors):
         best: CourseConcept | None = None
         best_score = 0.0
-        for candidate in existing:
+        for candidate in comparable:
             score = cosine_similarity(vector, candidate.embedding)
             if score > best_score:
                 best, best_score = candidate, score
@@ -118,13 +133,14 @@ def sync_document_concepts(db: Session, document_id: uuid.UUID) -> None:
             name=_unique_name(db, student_id, course_id, concept.name),
             summary=concept.summary,
             embedding=vector,
+            embedding_model=embedding_model,
         )
         db.add(canonical)
         db.flush()
         concept.course_concept_id = canonical.id
         # Visible to later concepts in this same batch, so a document that
         # mentions one idea twice does not create two canonical entries.
-        existing.append(canonical)
+        comparable.append(canonical)
 
     db.commit()
 

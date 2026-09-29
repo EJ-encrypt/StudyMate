@@ -94,7 +94,8 @@ backend/    FastAPI
   app/models/         SQLAlchemy models
   app/services/
     extraction/       per-format text extraction, dispatched by file type
-    ai/               AIProvider interface + Gemini adapter
+    ai/               AIProvider interface, Gemini and OpenAI adapters,
+                      shared prompts, and the fallback chain
     knowledge_base.py concept de-duplication and merging
     coaching.py       mastery, weak topics, recommendations
     gamification.py   XP, streaks, badges
@@ -109,10 +110,15 @@ generation never block the browser — the one exception is marking written
 answers, which happens during submission so the student gets feedback in
 the same response.
 
-The LLM provider sits behind an `AIProvider` interface with one concrete
-adapter, so swapping provider or model is a change in a single file. This
-was not hypothetical: the model had to change twice during development as
-free-tier availability shifted.
+The LLM provider sits behind an `AIProvider` interface. Two adapters exist
+(Gemini and OpenAI) and `AI_PROVIDERS` lists them in order: the first serves
+requests, the rest are tried when it fails. This is not hypothetical
+robustness - on a free tier every Gemini model can be rate-limited at once,
+and within one provider there is nowhere left to go.
+
+The OpenAI adapter has not been exercised against the live API for want of a
+key. Model lists are configuration (`GEMINI_MODELS`, `OPENAI_MODELS`) so a
+retired or misspelled model is fixable without a code change.
 
 ## Project status
 

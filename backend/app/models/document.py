@@ -66,6 +66,10 @@ class CourseConcept(Base):
     # hundred concepts, so similarity is computed in Python and no extension
     # or index is needed yet (PROJECT_PLAN.md left pgvector conditional).
     embedding: Mapped[list[float]] = mapped_column(JSONB, nullable=False)
+    # Which model produced the vector above. Vectors from different models have
+    # different geometry and often different dimensions, so similarity is only
+    # ever computed between concepts sharing this value.
+    embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     mentions: Mapped[list["KnowledgeConcept"]] = relationship(back_populates="course_concept")

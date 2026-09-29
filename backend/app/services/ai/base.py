@@ -52,6 +52,16 @@ class ShortAnswerGrade(BaseModel):
 class AIProvider(ABC):
     """Swappable LLM backend for StudyMate's AI features."""
 
+    @property
+    @abstractmethod
+    def embedding_model_id(self) -> str:
+        """Identifies the model behind embed().
+
+        Stored with every vector. Vectors from different models are not
+        comparable - different geometry, often different dimensions - so
+        similarity is only ever computed between vectors sharing this id.
+        """
+
     @abstractmethod
     def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]: ...
 

@@ -6,7 +6,6 @@ from google.genai import errors
 
 from app.services.ai.base import ShortAnswerSubmission
 from app.services.ai.gemini_provider import (
-    _MODELS,
     GeminiProvider,
     _ConceptList,
     _GradeList,
@@ -23,10 +22,16 @@ def _api_error(code: int) -> errors.APIError:
     return error
 
 
+MODELS = ["model-a", "model-b", "model-c"]
+
+
 @pytest.fixture()
 def provider() -> GeminiProvider:
     with patch("app.services.ai.gemini_provider.genai.Client"):
-        return GeminiProvider()
+        built = GeminiProvider()
+    # Pin the model list so the tests do not depend on configuration.
+    built._models = list(MODELS)
+    return built
 
 
 def _response(payload: str) -> MagicMock:
@@ -83,7 +88,7 @@ def test_gives_up_after_every_model_fails(provider: GeminiProvider) -> None:
         with pytest.raises(errors.APIError):
             provider.extract_concepts("some lecture text")
 
-    assert generate.call_count == len(_MODELS) * 2
+    assert generate.call_count == len(MODELS) * 2
 
 
 def test_does_not_retry_permanent_error(provider: GeminiProvider) -> None:

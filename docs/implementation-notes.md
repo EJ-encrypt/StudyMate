@@ -24,13 +24,44 @@ detection, LMS integration, non-English support.
 
 ## Decisions the plan left open
 
-**AI provider.** Not Claude, as originally costed. The budget line turned
+**AI provider.** Two adapters, chained. Not Claude, as originally costed. The budget line turned
 out to be documentation-only, with a standing requirement to use free
 tiers, and Anthropic has no sustained free API tier. Google AI Studio's
 Gemini does, so the concrete adapter targets Gemini. The provider-agnostic
 interface the plan insisted on earned its keep immediately: the model ID
 had to change twice, and retry and fallback logic was added, all inside
-one file.
+one file. It later paid off again when a second provider was added.
+
+`AI_PROVIDERS` is an ordered list, tried in turn, because within a single
+provider there is eventually nowhere left to go: measured against a live
+free-tier key, every Gemini Flash model returned 503 or 429 simultaneously
+for minutes at a time. A second provider is the only thing that helps, and it
+matters most during a usability session, where a participant who cannot get
+past an upload has learned nothing about the interface.
+
+Prompts and grade alignment moved into shared modules rather than being
+duplicated per adapter. A student should not get noticeably different
+questions because their upload happened to land on the fallback, and the
+hard-won details in those prompts - the reference formatting, the
+fill-in-the-blank constraint - must not drift apart between copies.
+
+**Embeddings cannot fall back silently.** Two embedding models produce
+vectors with different geometry and often different dimensions, so a
+similarity score between them is meaningless rather than merely imprecise.
+Every stored vector therefore records the model that produced it, the chain
+exposes `embed_tagged` instead of a plain `embed`, and de-duplication only
+compares concepts sharing an embedding model. When a fallback embeds a batch,
+the primary's existing concepts simply are not candidates - which can leave a
+duplicate, the recoverable direction, instead of merging on a nonsense score.
+
+**The OpenAI adapter is unverified against the live API.** No key was
+available. It is written from the published SDK shape and its call was
+confirmed to reach OpenAI's servers - a deliberately invalid key returned a
+structured 401 rather than a client-side type error, so the request is
+well-formed - but neither the model IDs nor the response parsing has been
+exercised for real. Both providers take their model lists from configuration
+(`GEMINI_MODELS`, `OPENAI_MODELS`) so a wrong name is fixable without a code
+change, which is exactly the failure that occurred with Gemini mid-project.
 
 **Short-answer grading — LLM-as-judge.** Measured against a fixed question
 and model answer, the judge accepted *"stops you storing the same thing

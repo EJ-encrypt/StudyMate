@@ -58,9 +58,18 @@ def _add_concepts(db: Session, document: LectureDocument, pairs: list[tuple[str,
     db.commit()
 
 
-def _provider(vectors: list[list[float]], verdicts: list[bool] | None = None) -> MagicMock:
+EMBEDDING_MODEL = "test:embedding:8"
+
+
+def _provider(
+    vectors: list[list[float]],
+    verdicts: list[bool] | None = None,
+    embedding_model: str = EMBEDDING_MODEL,
+) -> MagicMock:
     provider = MagicMock()
-    provider.embed.return_value = vectors
+    # embed_tagged reports which model produced the vectors, because vectors
+    # from different models must never be compared.
+    provider.embed_tagged.return_value = (vectors, embedding_model)
     provider.are_same_concept.return_value = verdicts or []
     return provider
 
@@ -294,3 +303,49 @@ def test_document_is_only_completed_after_the_knowledge_base_is_updated(client, 
     )
     db.refresh(document)
     assert document.status is DocumentStatus.COMPLETED
+
+
+def test_vectors_from_a_different_embedding_model_are_never_compared(client, db: Session) -> None:
+    """A fallback embedding must not be compared against the primary's.
+
+    Similarity across two embedding models is meaningless, so a concept
+    embedded by a fallback provider is left as a new entry - a duplicate,
+    which is recoverable - rather than merged on a nonsense score.
+    """
+    _, course, first = _student_course_document(db)
+    _add_concepts(db, first, [("Functional dependency", "X determines Y.")])
+    with patch("app.services.knowledge_base.get_ai_provider", return_value=_provider([[1.0, 0.0]])):
+        sync_document_concepts(db, first.id)
+
+    second = LectureDocument(
+        student_id=first.student_id,
+        course_id=course.id,
+        filename="week2.pdf",
+        storage_path="storage/week2.pdf",
+        status=DocumentStatus.COMPLETED,
+    )
+    db.add(second)
+    db.commit()
+    _add_concepts(db, second, [("Functional dependencies", "Each X maps to one Y.")])
+
+    # Identical vector, so similarity would be 1.0 and it would normally merge -
+    # but it came from a different embedding model.
+    other_model = _provider([[1.0, 0.0]], embedding_model="other:embedding:8")
+    with patch("app.services.knowledge_base.get_ai_provider", return_value=other_model):
+        sync_document_concepts(db, second.id)
+
+    canonical = db.query(CourseConcept).filter(CourseConcept.course_id == course.id).all()
+    assert len(canonical) == 2, "a cross-model match must not merge"
+    other_model.are_same_concept.assert_not_called()
+    assert {c.embedding_model for c in canonical} == {EMBEDDING_MODEL, "other:embedding:8"}
+
+
+def test_embedding_model_is_recorded_on_every_concept(client, db: Session) -> None:
+    _, course, document = _student_course_document(db)
+    _add_concepts(db, document, [("Deadlock", "Circular waiting.")])
+
+    with patch("app.services.knowledge_base.get_ai_provider", return_value=_provider([[1.0, 0.0]])):
+        sync_document_concepts(db, document.id)
+
+    concept = db.query(CourseConcept).filter(CourseConcept.course_id == course.id).one()
+    assert concept.embedding_model == EMBEDDING_MODEL
