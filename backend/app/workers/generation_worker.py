@@ -15,6 +15,7 @@ from app.services.ai import get_ai_provider
 from app.services.ai.base import GeneratedItem
 from app.services.ai.base import ItemKind as ProviderItemKind
 from app.services.extraction import extract_text
+from app.services.grading import normalize
 
 # An exam paper mixes question styles, weighted towards recognition and recall
 # with a couple of written answers, in the order a paper would present them.
@@ -47,21 +48,59 @@ def _exam_split(count: int) -> list[tuple[ItemKind, int]]:
     return allocated
 
 
-def _generate_items(source_text: str, kind: AssessmentKind, count: int) -> list[tuple[ItemKind, GeneratedItem]]:
+def _generate_items(
+    source_text: str,
+    kind: AssessmentKind,
+    count: int,
+    concept_names: list[str],
+) -> list[tuple[ItemKind, GeneratedItem]]:
     provider = get_ai_provider()
 
     if kind is AssessmentKind.EXAM:
         produced: list[tuple[ItemKind, GeneratedItem]] = []
         for item_kind, portion in _exam_split(count):
             items = provider.generate_assessment_items(
-                source_text, ProviderItemKind(item_kind.value), count=portion
+                source_text,
+                ProviderItemKind(item_kind.value),
+                count=portion,
+                concepts=concept_names,
             )
             produced.extend((item_kind, item) for item in items)
         return produced
 
     item_kind = ItemKind(kind.value)
-    items = provider.generate_assessment_items(source_text, ProviderItemKind(kind.value), count=count)
+    items = provider.generate_assessment_items(
+        source_text, ProviderItemKind(kind.value), count=count, concepts=concept_names
+    )
     return [(item_kind, item) for item in items]
+
+
+def _course_concepts(db: Session, assessment: Assessment) -> list[CourseConcept]:
+    return (
+        db.query(CourseConcept)
+        .filter(
+            CourseConcept.student_id == assessment.student_id,
+            CourseConcept.course_id == assessment.course_id,
+        )
+        .order_by(CourseConcept.created_at)
+        .all()
+    )
+
+
+def _resolve_concept(name: str, concepts: list[CourseConcept]) -> uuid.UUID | None:
+    """Map a generated item's concept tag onto the knowledge base.
+
+    Matching is on the normalised name only: an unmatched tag leaves the item
+    untied to a concept, which costs some mastery signal, whereas guessing
+    would credit or penalise the wrong topic.
+    """
+    if not name:
+        return None
+    wanted = normalize(name)
+    for concept in concepts:
+        if normalize(concept.name) == wanted:
+            return concept.id
+    return None
 
 
 def _source_text(db: Session, assessment: Assessment) -> str:
@@ -108,7 +147,10 @@ def process_assessment(assessment_id: str, count: int) -> None:
         try:
             source_text = _source_text(db, assessment)
 
-            produced = _generate_items(source_text, assessment.kind, count)
+            concepts = _course_concepts(db, assessment)
+            produced = _generate_items(
+                source_text, assessment.kind, count, [c.name for c in concepts]
+            )
             if not produced:
                 raise ValueError("The model returned no usable questions")
         except Exception as exc:  # noqa: BLE001 -- surfaced via assessment.error_message
@@ -127,6 +169,7 @@ def process_assessment(assessment_id: str, count: int) -> None:
                     answer=item.answer,
                     options=item.options,
                     explanation=item.explanation,
+                    course_concept_id=_resolve_concept(item.concept, concepts),
                 )
             )
         assessment.status = AssessmentStatus.COMPLETED

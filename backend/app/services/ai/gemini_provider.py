@@ -114,13 +114,26 @@ class GeminiProvider(AIProvider):
         source_text: str,
         kind: ItemKind,
         count: int = 10,
+        concepts: list[str] | None = None,
     ) -> list[GeneratedItem]:
         truncated = source_text[:_MAX_INPUT_CHARS]
+
+        if concepts:
+            listed = "\n".join(f"- {name}" for name in concepts)
+            tagging = (
+                "Set 'concept' on each item to the one entry from this list that the item "
+                "tests, copied exactly. If none of them fit, set 'concept' to an empty "
+                f"string.\nConcepts:\n{listed}\n"
+            )
+        else:
+            tagging = "Set 'concept' to the short name of the idea each item tests.\n"
+
         prompt = (
             f"You are setting revision material from the lecture content below.\n"
             f"{_ITEM_INSTRUCTIONS[kind].format(count=count)}\n"
             f"Set 'kind' to '{kind.value}' on every item. Base every item strictly on "
-            f"the content provided - do not introduce outside material.\n\n{truncated}"
+            f"the content provided - do not introduce outside material.\n"
+            f"{tagging}\n{truncated}"
         )
         response = self._generate_with_retry(prompt, _ItemList)
         parsed = _ItemList.model_validate_json(response.text)

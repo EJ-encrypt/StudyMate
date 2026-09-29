@@ -14,3 +14,5 @@ from app.models.assessment import (  # noqa: F401
     Attempt,
     AttemptAnswer,
 )
+from app.models.mastery import ConceptMastery  # noqa: F401
+from app.models.gamification import EarnedBadge, StudentProgress  # noqa: F401

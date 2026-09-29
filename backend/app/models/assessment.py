@@ -80,6 +80,11 @@ class AssessmentItem(Base):
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     explanation: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # Which knowledge-base concept this item tests, so a graded answer can
+    # move that concept's mastery. Null when it could not be placed.
+    course_concept_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("course_concepts.id"), nullable=True
+    )
 
     assessment: Mapped["Assessment"] = relationship(back_populates="items")
 

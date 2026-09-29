@@ -74,9 +74,18 @@ class GradedAnswer(BaseModel):
     explanation: str
 
 
+class NewBadge(BaseModel):
+    code: str
+    name: str
+    description: str
+
+
 class AttemptResult(BaseModel):
     id: uuid.UUID
     assessment_id: uuid.UUID
     correct_count: int
     total_count: int
     answers: list[GradedAnswer]
+    # Surfaced with the result so the student sees a badge the moment it is
+    # earned, rather than only on the profile page.
+    new_badges: list[NewBadge] = []

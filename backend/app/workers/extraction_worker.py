@@ -5,6 +5,7 @@ from app.db.session import SessionLocal
 from app.models.document import DocumentStatus, KnowledgeConcept, LectureDocument
 from app.services.ai import get_ai_provider
 from app.services.extraction import extract_text
+from app.services.gamification import record_document_processed
 from app.services.knowledge_base import sync_document_concepts
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ def process_document(document_id: str) -> None:
             sync_document_concepts(db, document.id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Knowledge-base sync failed for document %s: %s", document.id, exc)
+
+        record_document_processed(db, document.student_id)
 
         document.status = DocumentStatus.COMPLETED
         db.commit()

@@ -69,6 +69,18 @@ export default function Quiz() {
           <p className="font-semibold text-navy">
             Score: {result.correct_count} / {result.total_count}
           </p>
+          {result.new_badges.length > 0 && (
+            <div className="mt-3">
+              <p className="text-sm font-semibold text-navy">Badge earned</p>
+              <ul className="mt-1 flex flex-col gap-1">
+                {result.new_badges.map((badge) => (
+                  <li key={badge.code} className="text-sm text-navy/80">
+                    <span className="font-semibold">{badge.name}</span> - {badge.description}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

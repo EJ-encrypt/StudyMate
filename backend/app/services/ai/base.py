@@ -29,6 +29,9 @@ class GeneratedItem(BaseModel):
     answer: str
     options: list[str]
     explanation: str
+    # Which concept this item tests, so attempts can feed per-concept mastery.
+    # Empty when the generator could not place it against a known concept.
+    concept: str
 
 
 class ShortAnswerSubmission(BaseModel):
@@ -58,6 +61,7 @@ class AIProvider(ABC):
         source_text: str,
         kind: ItemKind,
         count: int = 10,
+        concepts: list[str] | None = None,
     ) -> list[GeneratedItem]: ...
 
     @abstractmethod

@@ -26,9 +26,12 @@ from app.schemas.assessment import (
     AttemptCreate,
     AttemptResult,
     GradedAnswer,
+    NewBadge,
 )
 from app.services.ai import get_ai_provider
 from app.services.ai.base import ShortAnswerGrade, ShortAnswerSubmission
+from app.services.coaching import record_answers
+from app.services.gamification import record_attempt
 from app.services.grading import is_correct
 from app.workers.generation_worker import process_assessment
 from app.workers.queue import queue
@@ -221,6 +224,13 @@ def submit_attempt(
             )
         )
 
+    record_answers(
+        db,
+        current_user.id,
+        assessment.course_id,
+        [(items[answer.item_id], answer.is_correct) for answer in graded],
+    )
+
     attempt = Attempt(
         assessment_id=assessment.id,
         student_id=current_user.id,
@@ -238,6 +248,9 @@ def submit_attempt(
                 is_correct=answer.is_correct,
             )
         )
+    new_badges = record_attempt(
+        db, current_user.id, assessment, attempt.correct_count, attempt.total_count
+    )
     db.commit()
     db.refresh(attempt)
 
@@ -247,4 +260,8 @@ def submit_attempt(
         correct_count=attempt.correct_count,
         total_count=attempt.total_count,
         answers=graded,
+        new_badges=[
+            NewBadge(code=badge.code, name=badge.name, description=badge.description)
+            for badge in new_badges
+        ],
     )

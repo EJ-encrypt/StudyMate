@@ -38,12 +38,19 @@ export interface GradedAnswer {
   explanation: string;
 }
 
+export interface NewBadge {
+  code: string;
+  name: string;
+  description: string;
+}
+
 export interface AttemptResult {
   id: string;
   assessment_id: string;
   correct_count: number;
   total_count: number;
   answers: GradedAnswer[];
+  new_badges: NewBadge[];
 }
 
 export const KIND_LABELS: Record<AssessmentKind, string> = {
