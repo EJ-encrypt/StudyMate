@@ -117,11 +117,11 @@ export default function Coach() {
                 ))}
               </ol>
               <p className="mt-4 text-sm text-navy/70">
-                Generate a cumulative quiz from{" "}
-                <Link to="/materials" className="font-semibold text-gold-dark">
-                  Materials
+                Open a topic above to revise it, or generate a cumulative quiz from{" "}
+                <Link to="/study" className="font-semibold text-gold-dark">
+                  Study Engine
                 </Link>{" "}
-                to practise these.
+                to practise all of them together.
               </p>
             </section>
           )}

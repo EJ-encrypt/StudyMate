@@ -50,6 +50,9 @@ export default function App() {
               <Route path="/quiz/:assessmentId" element={<Quiz />} />
             </Route>
             <Route path="/" element={<Navigate to="/courses" replace />} />
+            {/* The server serves index.html for any path, so an unknown URL has to
+                land somewhere here rather than rendering an empty page. */}
+            <Route path="*" element={<Navigate to="/courses" replace />} />
           </Routes>
         </main>
       </div>

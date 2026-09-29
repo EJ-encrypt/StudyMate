@@ -30,4 +30,11 @@ describe("App", () => {
     renderApp("/courses");
     expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
   });
+
+  // The server hands back index.html for every path, so a stale or mistyped URL
+  // reaches the router rather than a 404 and must not render a blank page.
+  it("sends an unknown path somewhere real instead of rendering nothing", async () => {
+    renderApp("/materials");
+    expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
+  });
 });
