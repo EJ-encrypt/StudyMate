@@ -15,3 +15,12 @@ class CourseRead(BaseModel):
     name: str
     code: str
     owner_id: uuid.UUID
+
+
+class CourseConceptRead(BaseModel):
+    """One entry in the cumulative knowledge base."""
+
+    id: uuid.UUID
+    name: str
+    summary: str
+    document_count: int

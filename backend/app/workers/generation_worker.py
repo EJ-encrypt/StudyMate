@@ -8,7 +8,9 @@ from app.models.assessment import (
     AssessmentStatus,
     ItemKind,
 )
-from app.models.document import LectureDocument
+from sqlalchemy.orm import Session
+
+from app.models.document import CourseConcept, LectureDocument
 from app.services.ai import get_ai_provider
 from app.services.ai.base import GeneratedItem
 from app.services.ai.base import ItemKind as ProviderItemKind
@@ -62,6 +64,37 @@ def _generate_items(source_text: str, kind: AssessmentKind, count: int) -> list[
     return [(item_kind, item) for item in items]
 
 
+def _source_text(db: Session, assessment: Assessment) -> str:
+    """What to generate from: one lecture, or the whole course knowledge base.
+
+    A cumulative paper is built from the de-duplicated concepts rather than by
+    re-reading every document, which keeps the request small however many
+    lectures the student has uploaded.
+    """
+    if assessment.document_id is None:
+        concepts = (
+            db.query(CourseConcept)
+            .filter(
+                CourseConcept.student_id == assessment.student_id,
+                CourseConcept.course_id == assessment.course_id,
+            )
+            .order_by(CourseConcept.created_at)
+            .all()
+        )
+        if not concepts:
+            raise ValueError("This course has no concepts to draw on yet")
+        return "\n".join(f"- {concept.name}: {concept.summary}" for concept in concepts)
+
+    document = db.get(LectureDocument, assessment.document_id)
+    if document is None:
+        raise ValueError("Source document no longer exists")
+
+    text = extract_text(document.storage_path)
+    if not text.strip():
+        raise ValueError("No readable text found in the source document")
+    return text
+
+
 def process_assessment(assessment_id: str, count: int) -> None:
     db = SessionLocal()
     try:
@@ -73,13 +106,7 @@ def process_assessment(assessment_id: str, count: int) -> None:
         db.commit()
 
         try:
-            document = db.get(LectureDocument, assessment.document_id)
-            if document is None:
-                raise ValueError("Source document no longer exists")
-
-            source_text = extract_text(document.storage_path)
-            if not source_text.strip():
-                raise ValueError("No readable text found in the source document")
+            source_text = _source_text(db, assessment)
 
             produced = _generate_items(source_text, assessment.kind, count)
             if not produced:

@@ -66,3 +66,17 @@ class AIProvider(ABC):
         submissions: list[ShortAnswerSubmission],
     ) -> list[ShortAnswerGrade]:
         """Mark free-text answers in one call, so a submission costs one request."""
+
+    @abstractmethod
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """Embed texts for similarity comparison, in the order given."""
+
+    @abstractmethod
+    def are_same_concept(self, pairs: list[tuple[str, str]]) -> list[bool]:
+        """Judge whether each pair names the same concept.
+
+        Similarity alone cannot settle this: measured on real concept text,
+        "Second Normal Form"/"Third Normal Form" scores *higher* than
+        "TLB"/"Translation Lookaside Buffer", so the bands overlap. This
+        adjudicates only the ambiguous middle.
+        """

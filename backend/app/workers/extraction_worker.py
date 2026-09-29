@@ -1,9 +1,13 @@
+import logging
 import uuid
 
 from app.db.session import SessionLocal
 from app.models.document import DocumentStatus, KnowledgeConcept, LectureDocument
 from app.services.ai import get_ai_provider
 from app.services.extraction import extract_text
+from app.services.knowledge_base import sync_document_concepts
+
+logger = logging.getLogger(__name__)
 
 
 def process_document(document_id: str) -> None:
@@ -37,6 +41,18 @@ def process_document(document_id: str) -> None:
                     summary=concept.summary,
                 )
             )
+        db.commit()
+
+        # Fold into the cumulative knowledge base *before* reporting completion:
+        # otherwise the document reads as done while its concepts are still
+        # being merged, and the course knowledge base looks incomplete.
+        # Failure here is not fatal -- the document's own concepts are already
+        # saved and usable -- so it only logs.
+        try:
+            sync_document_concepts(db, document.id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Knowledge-base sync failed for document %s: %s", document.id, exc)
+
         document.status = DocumentStatus.COMPLETED
         db.commit()
     finally:

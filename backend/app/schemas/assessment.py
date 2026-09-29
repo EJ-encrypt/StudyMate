@@ -1,15 +1,24 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.assessment import AssessmentKind, AssessmentStatus, ItemKind
 
 
 class AssessmentCreate(BaseModel):
-    document_id: uuid.UUID
+    """Either a single document, or a whole course for a cumulative paper."""
+
     kind: AssessmentKind
     count: int = Field(default=10, ge=1, le=20)
+    document_id: uuid.UUID | None = None
+    course_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_source(self) -> "AssessmentCreate":
+        if (self.document_id is None) == (self.course_id is None):
+            raise ValueError("Provide exactly one of document_id or course_id")
+        return self
 
 
 class AssessmentItemRead(BaseModel):
@@ -36,7 +45,7 @@ class AssessmentRead(BaseModel):
 
     id: uuid.UUID
     course_id: uuid.UUID
-    document_id: uuid.UUID
+    document_id: uuid.UUID | None
     title: str
     kind: AssessmentKind
     status: AssessmentStatus

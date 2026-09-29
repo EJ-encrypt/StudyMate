@@ -5,9 +5,11 @@ import {
   AssessmentKind,
   AssessmentSummary,
   createAssessment,
+  createCumulativeAssessment,
   KIND_LABELS,
   listAssessments,
 } from "../api/assessments";
+import { CourseConcept, listCourseConcepts } from "../api/courses";
 import { DocumentDetail, DocumentSummary, getDocument, listDocuments } from "../api/documents";
 import CourseSelect from "../components/CourseSelect";
 
@@ -26,16 +28,20 @@ export default function Materials() {
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [selected, setSelected] = useState<DocumentDetail | null>(null);
   const [busyDocumentId, setBusyDocumentId] = useState<string | null>(null);
+  const [knowledgeBase, setKnowledgeBase] = useState<CourseConcept[]>([]);
+  const [isGeneratingCumulative, setIsGeneratingCumulative] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     if (!courseId) return;
-    const [fetchedDocuments, fetchedAssessments] = await Promise.all([
+    const [fetchedDocuments, fetchedAssessments, fetchedConcepts] = await Promise.all([
       listDocuments(courseId),
       listAssessments(courseId),
+      listCourseConcepts(courseId),
     ]);
     setDocuments(fetchedDocuments);
     setAssessments(fetchedAssessments);
+    setKnowledgeBase(fetchedConcepts);
   }
 
   useEffect(() => {
@@ -57,6 +63,20 @@ export default function Materials() {
       setError("Could not start generation. Make sure the document finished processing.");
     } finally {
       setBusyDocumentId(null);
+    }
+  }
+
+  async function generateCumulative(kind: AssessmentKind) {
+    if (!courseId) return;
+    setIsGeneratingCumulative(true);
+    setError(null);
+    try {
+      await createCumulativeAssessment(courseId, kind);
+      await refresh();
+    } catch {
+      setError("Could not start a cumulative assessment for this course.");
+    } finally {
+      setIsGeneratingCumulative(false);
     }
   }
 
@@ -119,6 +139,52 @@ export default function Materials() {
           </li>
         ))}
       </ul>
+
+      {knowledgeBase.length > 0 && (
+        <section className="mt-10 rounded border border-navy/10 p-4">
+          <h2 className="font-semibold text-navy">
+            Course knowledge base
+            <span className="ml-2 text-sm font-normal text-navy/60">
+              {knowledgeBase.length} concepts across {documents.length} documents
+            </span>
+          </h2>
+          <p className="mt-1 text-sm text-navy/70">
+            Concepts from every document you have uploaded for this course, merged so a topic
+            taught in more than one lecture appears once.
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-navy/60">Cumulative:</span>
+            {KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={isGeneratingCumulative}
+                onClick={() => generateCumulative(kind)}
+                className="rounded border border-gold px-3 py-1 text-sm font-semibold text-navy hover:bg-gold/10 disabled:opacity-50"
+              >
+                {KIND_LABELS[kind]}
+              </button>
+            ))}
+          </div>
+
+          <ul className="mt-4 flex flex-col gap-2">
+            {knowledgeBase.map((concept) => (
+              <li key={concept.id}>
+                <p className="font-semibold text-navy">
+                  {concept.name}
+                  {concept.document_count > 1 && (
+                    <span className="ml-2 rounded bg-gold/20 px-2 py-0.5 text-xs font-normal text-navy/70">
+                      in {concept.document_count} documents
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-navy/70">{concept.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {assessments.length > 0 && (
         <section className="mt-10">

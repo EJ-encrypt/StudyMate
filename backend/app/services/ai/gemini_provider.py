@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 _MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 _MAX_INPUT_CHARS = 20000
 
+# 768 dimensions rather than the 3072 default: measured separation on concept
+# text is the same, and the vectors are stored per concept.
+_EMBEDDING_MODEL = "gemini-embedding-2"
+_EMBEDDING_DIM = 768
+
 # 429 = free-tier quota, 5xx = busy or flaking. All transient: without retries
 # one blip permanently fails a student's upload.
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -46,6 +51,15 @@ class _ItemList(BaseModel):
 
 class _GradeList(BaseModel):
     grades: list[ShortAnswerGrade]
+
+
+class _ConceptVerdict(BaseModel):
+    pair: int
+    same: bool
+
+
+class _VerdictList(BaseModel):
+    verdicts: list[_ConceptVerdict]
 
 
 def _clean_reference(reference: str) -> str:
@@ -144,6 +158,48 @@ class GeminiProvider(AIProvider):
         response = self._generate_with_retry(prompt, _GradeList)
         returned = _GradeList.model_validate_json(response.text).grades
         return self._align_grades(submissions, returned)
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        result = self._client.models.embed_content(
+            model=_EMBEDDING_MODEL,
+            contents=texts,
+            config={"output_dimensionality": _EMBEDDING_DIM},
+        )
+        return [embedding.values for embedding in result.embeddings]
+
+    def are_same_concept(self, pairs: list[tuple[str, str]]) -> list[bool]:
+        if not pairs:
+            return []
+
+        rendered = "\n\n".join(
+            f"Pair {index}:\nA: {first}\nB: {second}"
+            for index, (first, second) in enumerate(pairs, start=1)
+        )
+        prompt = (
+            "For each pair below, decide whether A and B describe the SAME academic "
+            "concept, just worded differently, abbreviated, or pluralised.\n"
+            "Answer true only if a lecturer would treat them as one entry in a glossary. "
+            "Answer false when they are distinct but related ideas - different normal "
+            "forms, different anomaly types, or a concept and a mechanism it uses - even "
+            "when the wording is similar.\n"
+            "Return one verdict per pair, in order, with 'pair' set to the pair number.\n\n"
+            f"{rendered}"
+        )
+
+        response = self._generate_with_retry(prompt, _VerdictList)
+        verdicts = _VerdictList.model_validate_json(response.text).verdicts
+        by_number = {verdict.pair: verdict.same for verdict in verdicts}
+
+        # An unanswered pair stays unmerged: a missed merge leaves a duplicate,
+        # while a wrong merge silently loses a concept from the knowledge base.
+        results = []
+        for index in range(1, len(pairs) + 1):
+            if index not in by_number:
+                logger.warning("No verdict for concept pair %s; leaving unmerged", index)
+            results.append(by_number.get(index, False))
+        return results
 
     @staticmethod
     def _align_grades(

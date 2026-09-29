@@ -15,7 +15,8 @@ from app.models.assessment import (
     AttemptAnswer,
     ItemKind,
 )
-from app.models.document import DocumentStatus, LectureDocument
+from app.models.course import Course
+from app.models.document import CourseConcept, DocumentStatus, LectureDocument
 from app.models.user import User
 from app.schemas.assessment import (
     AssessmentCreate,
@@ -58,20 +59,45 @@ def create_assessment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Assessment:
-    document = db.get(LectureDocument, payload.document_id)
-    if document is None or document.student_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if document.status is not DocumentStatus.COMPLETED:
-        raise HTTPException(
-            status_code=409,
-            detail="This document is still being processed; try again once it has finished.",
+    if payload.document_id is not None:
+        document = db.get(LectureDocument, payload.document_id)
+        if document is None or document.student_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Document not found")
+        if document.status is not DocumentStatus.COMPLETED:
+            raise HTTPException(
+                status_code=409,
+                detail="This document is still being processed; try again once it has finished.",
+            )
+        course_id = document.course_id
+        document_id = document.id
+        source_label = document.filename
+    else:
+        course = db.get(Course, payload.course_id)
+        if course is None or course.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        concept_count = (
+            db.query(CourseConcept)
+            .filter(
+                CourseConcept.student_id == current_user.id,
+                CourseConcept.course_id == course.id,
+            )
+            .count()
         )
+        if concept_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="This course has no concepts yet; upload and process material first.",
+            )
+        course_id = course.id
+        document_id = None
+        source_label = f"{course.code} (cumulative)"
 
     assessment = Assessment(
         student_id=current_user.id,
-        course_id=document.course_id,
-        document_id=document.id,
-        title=f"{_KIND_TITLES[payload.kind.value]} - {document.filename}",
+        course_id=course_id,
+        document_id=document_id,
+        title=f"{_KIND_TITLES[payload.kind.value]} - {source_label}",
         kind=payload.kind,
     )
     db.add(assessment)

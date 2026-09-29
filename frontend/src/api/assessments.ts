@@ -67,6 +67,20 @@ export async function createAssessment(
   return data;
 }
 
+/** Draws on the whole course knowledge base rather than one document. */
+export async function createCumulativeAssessment(
+  courseId: string,
+  kind: AssessmentKind,
+  count = 10,
+): Promise<AssessmentSummary> {
+  const { data } = await apiClient.post<AssessmentSummary>("/assessments", {
+    course_id: courseId,
+    kind,
+    count,
+  });
+  return data;
+}
+
 export async function listAssessments(courseId: string): Promise<AssessmentSummary[]> {
   const { data } = await apiClient.get<AssessmentSummary[]>("/assessments", {
     params: { course_id: courseId },

@@ -43,8 +43,10 @@ class Assessment(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False)
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("lecture_documents.id"), nullable=False
+    # Null for a cumulative assessment, which draws on the whole course
+    # knowledge base rather than a single lecture.
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lecture_documents.id"), nullable=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     kind: Mapped[AssessmentKind] = mapped_column(

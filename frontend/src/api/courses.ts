@@ -21,3 +21,15 @@ export async function createCourse(payload: CreateCoursePayload): Promise<Course
   const { data } = await apiClient.post<Course>("/courses", payload);
   return data;
 }
+
+export interface CourseConcept {
+  id: string;
+  name: string;
+  summary: string;
+  document_count: number;
+}
+
+export async function listCourseConcepts(courseId: string): Promise<CourseConcept[]> {
+  const { data } = await apiClient.get<CourseConcept[]>(`/courses/${courseId}/concepts`);
+  return data;
+}
