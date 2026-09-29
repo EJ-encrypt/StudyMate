@@ -13,6 +13,7 @@ class ItemKind(str, enum.Enum):
     FLASHCARD = "flashcard"
     MCQ = "mcq"
     FILL_BLANK = "fill_blank"
+    SHORT_ANSWER = "short_answer"
 
 
 class GeneratedItem(BaseModel):
@@ -30,13 +31,23 @@ class GeneratedItem(BaseModel):
     explanation: str
 
 
-class AIProvider(ABC):
-    """Swappable LLM backend for StudyMate's AI features.
+class ShortAnswerSubmission(BaseModel):
+    """One short answer awaiting marking, keyed so grades can be matched back."""
 
-    grade_short_answer joins this interface alongside short-answer and
-    exam generation, once that grading approach is settled
-    (PROJECT_PLAN.md open items).
-    """
+    reference: str
+    question: str
+    expected_answer: str
+    student_answer: str
+
+
+class ShortAnswerGrade(BaseModel):
+    reference: str
+    is_correct: bool
+    feedback: str
+
+
+class AIProvider(ABC):
+    """Swappable LLM backend for StudyMate's AI features."""
 
     @abstractmethod
     def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]: ...
@@ -48,3 +59,10 @@ class AIProvider(ABC):
         kind: ItemKind,
         count: int = 10,
     ) -> list[GeneratedItem]: ...
+
+    @abstractmethod
+    def grade_short_answers(
+        self,
+        submissions: list[ShortAnswerSubmission],
+    ) -> list[ShortAnswerGrade]:
+        """Mark free-text answers in one call, so a submission costs one request."""

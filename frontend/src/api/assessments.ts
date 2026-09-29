@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 
-export type ItemKind = "flashcard" | "mcq" | "fill_blank";
+export type ItemKind = "flashcard" | "mcq" | "fill_blank" | "short_answer";
+export type AssessmentKind = ItemKind | "exam";
 export type AssessmentStatus = "pending" | "processing" | "completed" | "failed";
 
 export interface AssessmentSummary {
@@ -8,7 +9,7 @@ export interface AssessmentSummary {
   course_id: string;
   document_id: string;
   title: string;
-  kind: ItemKind;
+  kind: AssessmentKind;
   status: AssessmentStatus;
   error_message: string | null;
   created_at: string;
@@ -45,15 +46,17 @@ export interface AttemptResult {
   answers: GradedAnswer[];
 }
 
-export const KIND_LABELS: Record<ItemKind, string> = {
+export const KIND_LABELS: Record<AssessmentKind, string> = {
   flashcard: "Flashcards",
   mcq: "Multiple choice",
   fill_blank: "Fill in the blank",
+  short_answer: "Short answer",
+  exam: "Exam paper",
 };
 
 export async function createAssessment(
   documentId: string,
-  kind: ItemKind,
+  kind: AssessmentKind,
   count = 10,
 ): Promise<AssessmentSummary> {
   const { data } = await apiClient.post<AssessmentSummary>("/assessments", {

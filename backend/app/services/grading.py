@@ -17,15 +17,14 @@ def normalize(text: str) -> str:
     return " ".join(words)
 
 
-def is_correct(kind: ItemKind, expected: str, response: str) -> bool:
-    """Grade one answer.
+# Kinds an exact comparison can mark. Short answers are free text, so they go
+# to the AI provider's judge instead (PROJECT_PLAN.md open item, settled as
+# LLM-as-judge); flashcards are self-reviewed and never machine-marked.
+DETERMINISTIC_KINDS = (ItemKind.MCQ, ItemKind.FILL_BLANK)
 
-    Flashcards are self-reviewed rather than marked, so they never count
-    towards a score; callers filter them out before building an attempt.
-    """
-    if kind is ItemKind.FLASHCARD:
+
+def is_correct(kind: ItemKind, expected: str, response: str) -> bool:
+    """Grade one answer that can be marked by comparison alone."""
+    if kind not in DETERMINISTIC_KINDS:
         return False
     return bool(normalize(response)) and normalize(response) == normalize(expected)
-
-
-GRADED_KINDS = (ItemKind.MCQ, ItemKind.FILL_BLANK)

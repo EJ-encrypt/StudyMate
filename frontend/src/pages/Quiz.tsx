@@ -99,7 +99,7 @@ export default function Quiz() {
                 <legend className="px-1 text-sm font-semibold text-navy/60">{item.position}</legend>
                 <p className="font-semibold text-navy">{item.question}</p>
 
-                {item.kind === "mcq" ? (
+                {item.kind === "mcq" && (
                   <div className="mt-3 flex flex-col gap-2">
                     {item.options.map((option) => (
                       <label key={option} className="flex items-center gap-2 text-navy">
@@ -115,7 +115,20 @@ export default function Quiz() {
                       </label>
                     ))}
                   </div>
-                ) : (
+                )}
+
+                {item.kind === "short_answer" && (
+                  <textarea
+                    placeholder="Answer in one to three sentences"
+                    value={responses[item.id] ?? ""}
+                    disabled={!!result}
+                    rows={4}
+                    onChange={(e) => setResponses((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    className="mt-3 w-full rounded border border-navy/20 px-3 py-2"
+                  />
+                )}
+
+                {item.kind === "fill_blank" && (
                   <input
                     type="text"
                     placeholder="Your answer"
@@ -129,8 +142,13 @@ export default function Quiz() {
                 {answer && (
                   <div className="mt-3 text-sm">
                     <p className={answer.is_correct ? "font-semibold text-green-700" : "font-semibold text-red-600"}>
-                      {answer.is_correct ? "Correct" : `Incorrect - answer: ${answer.correct_answer}`}
+                      {answer.is_correct ? "Correct" : "Incorrect"}
                     </p>
+                    {!answer.is_correct && (
+                      <p className="mt-1 text-navy">
+                        <span className="font-semibold">Model answer:</span> {answer.correct_answer}
+                      </p>
+                    )}
                     {answer.explanation && <p className="mt-1 text-navy/70">{answer.explanation}</p>}
                   </div>
                 )}

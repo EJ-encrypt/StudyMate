@@ -4,10 +4,12 @@ import pytest
 import requests
 from google.genai import errors
 
+from app.services.ai.base import ShortAnswerSubmission
 from app.services.ai.gemini_provider import (
     _MODELS,
     GeminiProvider,
     _ConceptList,
+    _GradeList,
     _ItemList,
 )
 
@@ -116,7 +118,7 @@ def test_response_schemas_carry_no_defaults() -> None:
                         found.extend(defaults_in(entry, f"{path}.{key}[{index}]"))
         return found
 
-    for schema_model in (_ConceptList, _ItemList):
+    for schema_model in (_ConceptList, _ItemList, _GradeList):
         assert defaults_in(schema_model.model_json_schema()) == [], (
             f"{schema_model.__name__} has defaults; Gemini will reject it"
         )
@@ -131,3 +133,78 @@ def test_caps_concepts_at_requested_maximum(provider: GeminiProvider) -> None:
     concepts = provider.extract_concepts("text", max_concepts=10)
 
     assert len(concepts) == 10
+
+
+GRADE_REFS = ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+
+
+def _submissions() -> list[ShortAnswerSubmission]:
+    return [
+        ShortAnswerSubmission(
+            reference=ref,
+            question=f"Q{index}",
+            expected_answer=f"model {index}",
+            student_answer=f"student {index}",
+        )
+        for index, ref in enumerate(GRADE_REFS, start=1)
+    ]
+
+
+def _grades_payload(references: list[str], verdicts: list[bool]) -> str:
+    entries = ", ".join(
+        f'{{"reference": "{ref}", "is_correct": {str(v).lower()}, "feedback": "note {i}"}}'
+        for i, (ref, v) in enumerate(zip(references, verdicts), start=1)
+    )
+    return f'{{"grades": [{entries}]}}'
+
+
+def test_matches_grades_by_reference(provider: GeminiProvider) -> None:
+    provider._client.models.generate_content.return_value = _response(
+        _grades_payload(GRADE_REFS, [True, False])
+    )
+
+    grades = provider.grade_short_answers(_submissions())
+
+    assert [g.reference for g in grades] == GRADE_REFS
+    assert [g.is_correct for g in grades] == [True, False]
+
+
+def test_matches_grades_when_model_decorates_the_reference(provider: GeminiProvider) -> None:
+    """The model echoed "[ref]" rather than "ref", which silently unmarked everything."""
+    decorated = [f"[{ref}]" for ref in GRADE_REFS]
+    provider._client.models.generate_content.return_value = _response(
+        _grades_payload(decorated, [True, False])
+    )
+
+    grades = provider.grade_short_answers(_submissions())
+
+    assert [g.reference for g in grades] == GRADE_REFS
+    assert [g.is_correct for g in grades] == [True, False]
+
+
+def test_falls_back_to_order_when_references_are_unusable(provider: GeminiProvider) -> None:
+    provider._client.models.generate_content.return_value = _response(
+        _grades_payload(["question one", "question two"], [False, True])
+    )
+
+    grades = provider.grade_short_answers(_submissions())
+
+    assert [g.reference for g in grades] == GRADE_REFS
+    assert [g.is_correct for g in grades] == [False, True]
+
+
+def test_reports_unmarked_when_counts_do_not_line_up(provider: GeminiProvider) -> None:
+    provider._client.models.generate_content.return_value = _response(
+        _grades_payload(["nonsense"], [True])
+    )
+
+    grades = provider.grade_short_answers(_submissions())
+
+    assert [g.reference for g in grades] == GRADE_REFS
+    assert all(not g.is_correct for g in grades)
+    assert all("unavailable" in g.feedback.lower() for g in grades)
+
+
+def test_no_submissions_makes_no_call(provider: GeminiProvider) -> None:
+    assert provider.grade_short_answers([]) == []
+    provider._client.models.generate_content.assert_not_called()

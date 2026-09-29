@@ -8,7 +8,14 @@ from google.genai import errors, types
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.services.ai.base import AIProvider, ExtractedConcept, GeneratedItem, ItemKind
+from app.services.ai.base import (
+    AIProvider,
+    ExtractedConcept,
+    GeneratedItem,
+    ItemKind,
+    ShortAnswerGrade,
+    ShortAnswerSubmission,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +44,14 @@ class _ItemList(BaseModel):
     items: list[GeneratedItem]
 
 
+class _GradeList(BaseModel):
+    grades: list[ShortAnswerGrade]
+
+
+def _clean_reference(reference: str) -> str:
+    return reference.strip().strip("[]()\"'").strip().lower()
+
+
 _ITEM_INSTRUCTIONS = {
     ItemKind.FLASHCARD: (
         "Write {count} flashcards. 'question' is the prompt side, 'answer' is the "
@@ -47,6 +62,12 @@ _ITEM_INSTRUCTIONS = {
         "holds exactly four distinct answer choices, and 'answer' repeats the correct "
         "option verbatim. Wrong options must be plausible. Use 'explanation' to say "
         "briefly why the answer is right."
+    ),
+    ItemKind.SHORT_ANSWER: (
+        "Write {count} short-answer questions. 'question' asks for an explanation a "
+        "student can give in one to three sentences, 'answer' is the model answer "
+        "marking should accept, and 'explanation' notes the key points that must "
+        "appear for the answer to count. Leave 'options' empty."
     ),
     ItemKind.FILL_BLANK: (
         "Write {count} fill-in-the-blank questions. 'question' is a sentence with one "
@@ -90,6 +111,88 @@ class GeminiProvider(AIProvider):
         response = self._generate_with_retry(prompt, _ItemList)
         parsed = _ItemList.model_validate_json(response.text)
         return [item for item in parsed.items if item.kind == kind][:count]
+
+    def grade_short_answers(
+        self,
+        submissions: list[ShortAnswerSubmission],
+    ) -> list[ShortAnswerGrade]:
+        if not submissions:
+            return []
+
+        # Reference on its own labelled line: wrapping it in brackets made the
+        # model echo the brackets back as part of the reference.
+        rendered = "\n\n".join(
+            f"Reference: {submission.reference}\n"
+            f"Question: {submission.question}\n"
+            f"Model answer: {submission.expected_answer}\n"
+            f"Student answer: {submission.student_answer}"
+            for submission in submissions
+        )
+        prompt = (
+            "Mark each student answer below against its model answer. Award credit for "
+            "an answer that conveys the same understanding, even if worded differently, "
+            "less formally, or more briefly. Do not require the model answer's exact "
+            "wording. Mark it incorrect if a key point is missing, contradicted, or the "
+            "answer is blank, off-topic, or merely restates the question.\n"
+            "Return exactly one grade per question, in the same order. Copy each "
+            "'reference' exactly as given, with no added punctuation or brackets. Write "
+            "'feedback' as one or two sentences addressed to the student, saying what was "
+            "right or what was missing.\n\n"
+            f"{rendered}"
+        )
+
+        response = self._generate_with_retry(prompt, _GradeList)
+        returned = _GradeList.model_validate_json(response.text).grades
+        return self._align_grades(submissions, returned)
+
+    @staticmethod
+    def _align_grades(
+        submissions: list[ShortAnswerSubmission],
+        returned: list[ShortAnswerGrade],
+    ) -> list[ShortAnswerGrade]:
+        """Match grades to submissions, tolerating how the model echoes references.
+
+        Models decorate the reference (brackets, quotes, stray whitespace), so
+        matching is done on a cleaned form. If a reference still cannot be
+        matched but the counts line up, order is trusted instead. Anything left
+        over is reported unmarked rather than risking a grade being attributed
+        to the wrong question.
+        """
+        by_reference = {_clean_reference(grade.reference): grade for grade in returned}
+        positional = returned if len(returned) == len(submissions) else []
+
+        results = []
+        for index, submission in enumerate(submissions):
+            grade = by_reference.get(_clean_reference(submission.reference))
+            if grade is None and positional:
+                grade = positional[index]
+                logger.warning(
+                    "Reference %s not echoed back; matched grade by position",
+                    submission.reference,
+                )
+
+            if grade is None:
+                logger.warning("No grade returned for %s; marking as needing review", submission.reference)
+                results.append(
+                    ShortAnswerGrade(
+                        reference=submission.reference,
+                        is_correct=False,
+                        feedback=(
+                            "Automatic marking is unavailable for this answer. "
+                            "Compare it with the model answer."
+                        ),
+                    )
+                )
+            else:
+                # Return our own reference so callers can always match on it.
+                results.append(
+                    ShortAnswerGrade(
+                        reference=submission.reference,
+                        is_correct=grade.is_correct,
+                        feedback=grade.feedback,
+                    )
+                )
+        return results
 
     def _generate_with_retry(self, prompt: str, schema: type[BaseModel]):
         """Retry transient failures, then fall back to the next model."""

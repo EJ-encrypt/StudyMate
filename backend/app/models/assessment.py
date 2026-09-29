@@ -20,6 +20,17 @@ class ItemKind(str, enum.Enum):
     FLASHCARD = "flashcard"
     MCQ = "mcq"
     FILL_BLANK = "fill_blank"
+    SHORT_ANSWER = "short_answer"
+
+
+class AssessmentKind(str, enum.Enum):
+    """What was requested. Distinct from ItemKind because an exam mixes kinds."""
+
+    FLASHCARD = "flashcard"
+    MCQ = "mcq"
+    FILL_BLANK = "fill_blank"
+    SHORT_ANSWER = "short_answer"
+    EXAM = "exam"
 
 
 def _enum_values(enum_cls) -> list[str]:
@@ -36,8 +47,8 @@ class Assessment(Base):
         UUID(as_uuid=True), ForeignKey("lecture_documents.id"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    kind: Mapped[ItemKind] = mapped_column(
-        Enum(ItemKind, name="item_kind", values_callable=_enum_values), nullable=False
+    kind: Mapped[AssessmentKind] = mapped_column(
+        Enum(AssessmentKind, name="assessment_kind", values_callable=_enum_values), nullable=False
     )
     status: Mapped[AssessmentStatus] = mapped_column(
         Enum(AssessmentStatus, name="assessment_status", values_callable=_enum_values),

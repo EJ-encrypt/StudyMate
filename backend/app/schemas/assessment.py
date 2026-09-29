@@ -3,12 +3,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.assessment import AssessmentStatus, ItemKind
+from app.models.assessment import AssessmentKind, AssessmentStatus, ItemKind
 
 
 class AssessmentCreate(BaseModel):
     document_id: uuid.UUID
-    kind: ItemKind
+    kind: AssessmentKind
     count: int = Field(default=10, ge=1, le=20)
 
 
@@ -38,7 +38,7 @@ class AssessmentRead(BaseModel):
     course_id: uuid.UUID
     document_id: uuid.UUID
     title: str
-    kind: ItemKind
+    kind: AssessmentKind
     status: AssessmentStatus
     error_message: str | None
     created_at: datetime

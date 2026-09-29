@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
+  AssessmentKind,
   AssessmentSummary,
   createAssessment,
-  ItemKind,
   KIND_LABELS,
   listAssessments,
 } from "../api/assessments";
@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<DocumentSummary["status"], string> = {
   failed: "Failed",
 };
 
-const KINDS: ItemKind[] = ["flashcard", "mcq", "fill_blank"];
+const KINDS: AssessmentKind[] = ["flashcard", "mcq", "fill_blank", "short_answer", "exam"];
 
 export default function Materials() {
   const [courseId, setCourseId] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function Materials() {
     setSelected(await getDocument(documentId));
   }
 
-  async function generate(documentId: string, kind: ItemKind) {
+  async function generate(documentId: string, kind: AssessmentKind) {
     setBusyDocumentId(documentId);
     setError(null);
     try {

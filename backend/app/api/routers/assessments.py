@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,6 +9,7 @@ from app.db.session import get_db
 from app.models.assessment import (
     Assessment,
     AssessmentItem,
+    AssessmentKind,
     AssessmentStatus,
     Attempt,
     AttemptAnswer,
@@ -24,9 +26,13 @@ from app.schemas.assessment import (
     AttemptResult,
     GradedAnswer,
 )
+from app.services.ai import get_ai_provider
+from app.services.ai.base import ShortAnswerGrade, ShortAnswerSubmission
 from app.services.grading import is_correct
 from app.workers.generation_worker import process_assessment
 from app.workers.queue import queue
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assessments", tags=["assessments"])
 
@@ -34,6 +40,8 @@ _KIND_TITLES = {
     "flashcard": "Flashcards",
     "mcq": "Multiple choice",
     "fill_blank": "Fill in the blank",
+    "short_answer": "Short answer",
+    "exam": "Exam paper",
 }
 
 
@@ -96,7 +104,6 @@ def get_assessment(
     current_user: User = Depends(get_current_user),
 ) -> AssessmentDetail:
     assessment = _own_assessment(db, assessment_id, current_user)
-    reveal = assessment.kind is ItemKind.FLASHCARD
 
     return AssessmentDetail(
         id=assessment.id,
@@ -114,8 +121,9 @@ def get_assessment(
                 kind=item.kind,
                 question=item.question,
                 options=item.options,
-                answer=item.answer if reveal else None,
-                explanation=item.explanation if reveal else None,
+                # Per item, not per assessment: an exam may mix flashcards in.
+                answer=item.answer if item.kind is ItemKind.FLASHCARD else None,
+                explanation=item.explanation if item.kind is ItemKind.FLASHCARD else None,
             )
             for item in assessment.items
         ],
@@ -140,17 +148,50 @@ def submit_attempt(
             status_code=400, detail=f"These items do not belong to this assessment: {', '.join(unknown)}"
         )
 
+    # Free-text answers are marked by the AI provider in a single batched call;
+    # everything else is compared locally so a quiz with no written answers
+    # costs no model time at all.
+    written = [
+        ShortAnswerSubmission(
+            reference=str(submission.item_id),
+            question=items[submission.item_id].question,
+            expected_answer=items[submission.item_id].answer,
+            student_answer=submission.response,
+        )
+        for submission in payload.answers
+        if items[submission.item_id].kind is ItemKind.SHORT_ANSWER
+    ]
+
+    judged: dict[str, ShortAnswerGrade] = {}
+    if written:
+        try:
+            judged = {grade.reference: grade for grade in get_ai_provider().grade_short_answers(written)}
+        except Exception as exc:  # noqa: BLE001 -- the attempt is still worth recording
+            logger.warning("Short-answer marking failed: %s", exc)
+
     graded: list[GradedAnswer] = []
     for submission in payload.answers:
         item: AssessmentItem = items[submission.item_id]
-        correct = is_correct(item.kind, item.answer, submission.response)
+        grade = judged.get(str(item.id))
+
+        if item.kind is ItemKind.SHORT_ANSWER:
+            correct = grade.is_correct if grade else False
+            feedback = (
+                grade.feedback
+                if grade
+                else "Automatic marking is unavailable right now. Compare your answer with the model answer."
+            )
+        else:
+            correct = is_correct(item.kind, item.answer, submission.response)
+            feedback = item.explanation
+
         graded.append(
             GradedAnswer(
                 item_id=item.id,
                 response=submission.response,
                 is_correct=correct,
                 correct_answer=item.answer,
-                explanation=item.explanation,
+                explanation=feedback,
             )
         )
 
