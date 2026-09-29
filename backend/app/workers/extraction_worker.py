@@ -57,16 +57,19 @@ def process_document(document_id: str) -> None:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Knowledge-base sync failed for document %s: %s", document.id, exc)
 
-        # The course overview describes the material as a whole, so it goes
-        # stale the moment a lecture is added. Also non-fatal.
-        try:
-            refresh_course_summary(db, document.student_id, document.course_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Course summary refresh failed for %s: %s", document.course_id, exc)
-
         record_document_processed(db, document.student_id)
 
         document.status = DocumentStatus.COMPLETED
         db.commit()
+
+        # After completion, unlike the knowledge-base sync above: the overview
+        # covers every finished document in the course, so it waits until this
+        # one counts as finished. On a multi-file upload that means only the
+        # last file to land pays for it. Also non-fatal -- a stale overview is
+        # worth far less than the material itself, which is already saved.
+        try:
+            refresh_course_summary(db, document.student_id, document.course_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Course summary refresh failed for %s: %s", document.course_id, exc)
     finally:
         db.close()

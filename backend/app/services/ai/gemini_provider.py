@@ -40,11 +40,22 @@ logger = logging.getLogger(__name__)
 _EMBEDDING_MODEL = "gemini-embedding-2"
 _EMBEDDING_DIM = 768
 
-# 429 = free-tier quota, 5xx = busy or flaking. All transient: without retries
-# one blip permanently fails a student's upload.
-_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+# 5xx = busy or flaking, and worth another go a second later. 429 is different:
+# it means the free-tier quota for that model is spent, which a two-second
+# backoff cannot fix, so it is handled by _QUOTA_COOLDOWN below instead of by
+# retrying. Without any retries one blip permanently fails a student's upload.
+_RETRYABLE_STATUS = frozenset({500, 502, 503, 504})
+_QUOTA_EXHAUSTED_STATUS = 429
 _ATTEMPTS_PER_MODEL = 2
 _BACKOFF_BASE_SECONDS = 2.0
+
+# How long to leave a quota-exhausted model alone. Measured: every call was
+# paying two failed attempts plus a backoff on a model that had returned 429 all
+# day (~9s of the ~13s each call took) before reaching one that answered.
+# Short enough that a per-minute quota is picked up again promptly, long enough
+# that a spent daily quota is only re-probed once a minute.
+_QUOTA_COOLDOWN_SECONDS = 60.0
+_quota_cooldown_until: dict[str, float] = {}
 
 
 class _ConceptList(BaseModel):
@@ -147,10 +158,19 @@ class GeminiProvider(AIProvider):
 
 
     def _generate_with_retry(self, prompt: str, schema: type[BaseModel]):
-        """Retry transient failures, then fall back to the next model."""
+        """Retry transient failures, then fall back to the next model.
+
+        Models whose quota is spent are skipped outright rather than retried:
+        see _QUOTA_COOLDOWN_SECONDS.
+        """
         last_error: Exception | None = None
+        skipped: list[str] = []
 
         for model in self._models:
+            if time.monotonic() < _quota_cooldown_until.get(model, 0.0):
+                skipped.append(model)
+                continue
+
             for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
                 try:
                     return self._client.models.generate_content(
@@ -162,6 +182,19 @@ class GeminiProvider(AIProvider):
                         ),
                     )
                 except errors.APIError as exc:
+                    if exc.code == _QUOTA_EXHAUSTED_STATUS:
+                        # Out of quota, not busy. Waiting two seconds and asking
+                        # the same model again only delays the fallback.
+                        _quota_cooldown_until[model] = (
+                            time.monotonic() + _QUOTA_COOLDOWN_SECONDS
+                        )
+                        last_error = exc
+                        logger.warning(
+                            "%s is out of quota; skipping it for %.0fs",
+                            model,
+                            _QUOTA_COOLDOWN_SECONDS,
+                        )
+                        break
                     if exc.code not in _RETRYABLE_STATUS:
                         raise
                     last_error = exc
@@ -183,5 +216,15 @@ class GeminiProvider(AIProvider):
                     time.sleep(delay)
                 else:
                     logger.warning("%s unavailable (%s); falling back", model, reason)
+
+        if last_error is None and skipped:
+            # Everything is in cooldown, so nothing was actually tried. Clear the
+            # cooldowns and let the next call probe again rather than reporting a
+            # failure no request was ever made for.
+            _quota_cooldown_until.clear()
+            raise RuntimeError(
+                "Every configured Gemini model is out of quota. "
+                "Free-tier quota resets daily; try again later."
+            )
 
         raise last_error

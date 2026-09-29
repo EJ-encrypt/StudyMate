@@ -4,6 +4,7 @@ import pytest
 import requests
 from google.genai import errors
 
+from app.services.ai import gemini_provider as gemini_module
 from app.services.ai.base import ShortAnswerSubmission
 from app.services.ai.gemini_provider import (
     GeminiProvider,
@@ -11,6 +12,14 @@ from app.services.ai.gemini_provider import (
     _GradeList,
     _ItemList,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_quota_cooldowns():
+    """The cooldown map is module state, so it would leak between tests."""
+    gemini_module._quota_cooldown_until.clear()
+    yield
+    gemini_module._quota_cooldown_until.clear()
 
 
 def _api_error(code: int) -> errors.APIError:
@@ -89,6 +98,70 @@ def test_gives_up_after_every_model_fails(provider: GeminiProvider) -> None:
             provider.extract_concepts("some lecture text")
 
     assert generate.call_count == len(MODELS) * 2
+
+
+def test_quota_error_moves_on_without_retrying_the_same_model(provider: GeminiProvider) -> None:
+    """429 means the quota is spent, which a two-second backoff cannot fix.
+
+    Retrying it was costing roughly nine seconds of every call before a model
+    that could answer was even tried.
+    """
+    generate = provider._client.models.generate_content
+    generate.side_effect = [_api_error(429), _response(PAYLOAD)]
+
+    with patch("app.services.ai.gemini_provider.time.sleep") as sleep:
+        concepts = provider.extract_concepts("some lecture text")
+
+    assert [c.name for c in concepts] == ["Deadlock"]
+    assert generate.call_count == 2
+    models_tried = [call.kwargs["model"] for call in generate.call_args_list]
+    assert models_tried == [MODELS[0], MODELS[1]], "should move straight to the next model"
+    sleep.assert_not_called()
+
+
+def test_exhausted_model_is_skipped_on_the_next_call(provider: GeminiProvider) -> None:
+    generate = provider._client.models.generate_content
+    generate.side_effect = [_api_error(429), _response(PAYLOAD), _response(PAYLOAD)]
+
+    with patch("app.services.ai.gemini_provider.time.sleep"):
+        provider.extract_concepts("first")
+        provider.extract_concepts("second")
+
+    models_tried = [call.kwargs["model"] for call in generate.call_args_list]
+    # The second call should not waste a request on the model already known to
+    # be out of quota.
+    assert models_tried == [MODELS[0], MODELS[1], MODELS[1]]
+
+
+def test_cooldown_expires_so_a_reset_quota_is_picked_up(provider: GeminiProvider) -> None:
+    generate = provider._client.models.generate_content
+    generate.side_effect = [_api_error(429), _response(PAYLOAD), _response(PAYLOAD)]
+
+    with patch("app.services.ai.gemini_provider.time.sleep"):
+        provider.extract_concepts("first")
+        # Jump just past this model's actual cooldown deadline. The deadline is
+        # set from the real clock, so it has to be read rather than assumed.
+        deadline = gemini_module._quota_cooldown_until[MODELS[0]]
+        with patch(
+            "app.services.ai.gemini_provider.time.monotonic",
+            return_value=deadline + 1,
+        ):
+            provider.extract_concepts("second")
+
+    models_tried = [call.kwargs["model"] for call in generate.call_args_list]
+    assert models_tried[-1] == MODELS[0], "the first model should be tried again once quota may have reset"
+
+
+def test_says_so_plainly_when_every_model_is_out_of_quota(provider: GeminiProvider) -> None:
+    generate = provider._client.models.generate_content
+    generate.side_effect = _api_error(429)
+
+    with patch("app.services.ai.gemini_provider.time.sleep"):
+        with pytest.raises(errors.APIError):
+            provider.extract_concepts("some lecture text")
+
+    # One request per model, not one per model per attempt.
+    assert generate.call_count == len(MODELS)
 
 
 def test_does_not_retry_permanent_error(provider: GeminiProvider) -> None:
