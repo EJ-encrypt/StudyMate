@@ -9,7 +9,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.course import Course
-from app.models.document import LectureDocument
+from app.models.document import DocumentStatus, LectureDocument
 from app.models.user import User
 from app.schemas.document import DocumentDetail, DocumentRead, NotesCreate
 from app.services.extraction import SUPPORTED_EXTENSIONS
@@ -128,4 +128,37 @@ def get_document(
     document = db.get(LectureDocument, document_id)
     if document is None or document.student_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.post("/{document_id}/retry", response_model=DocumentRead)
+def retry_document(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LectureDocument:
+    """Re-queue a document whose processing failed for a transient reason.
+
+    The file is already stored, so this costs nothing but another attempt at
+    the AI service - which is the whole point when the failure was a rate
+    limit rather than a bad document.
+    """
+    document = db.get(LectureDocument, document_id)
+    if document is None or document.student_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.status is not DocumentStatus.FAILED:
+        raise HTTPException(status_code=409, detail="This document has not failed")
+    if not document.can_retry:
+        raise HTTPException(
+            status_code=409,
+            detail="This document cannot be processed by retrying; the problem is with the file itself.",
+        )
+
+    document.status = DocumentStatus.PENDING
+    document.error_message = None
+    document.can_retry = False
+    db.commit()
+    db.refresh(document)
+
+    queue.enqueue(process_document, str(document.id))
     return document

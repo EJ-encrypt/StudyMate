@@ -1,0 +1,18 @@
+# Builds the static bundle into a volume the API serves. Not a server image:
+# there is no nginx here, because the FastAPI app hosts the files itself so
+# the app has a single origin.
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci || npm install
+
+COPY . .
+
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+
+CMD ["sh", "-c", "rm -rf /output/* && cp -r /app/dist/. /output/ && echo 'frontend build copied to /output'"]

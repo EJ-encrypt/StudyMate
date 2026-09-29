@@ -8,9 +8,16 @@ import {
   createCumulativeAssessment,
   KIND_LABELS,
   listAssessments,
+  retryAssessment,
 } from "../api/assessments";
 import { CourseConcept, listCourseConcepts } from "../api/courses";
-import { DocumentDetail, DocumentSummary, getDocument, listDocuments } from "../api/documents";
+import {
+  DocumentDetail,
+  DocumentSummary,
+  getDocument,
+  listDocuments,
+  retryDocument,
+} from "../api/documents";
 import CourseSelect from "../components/CourseSelect";
 
 const STATUS_LABEL: Record<DocumentSummary["status"], string> = {
@@ -66,6 +73,20 @@ export default function Materials() {
     }
   }
 
+  async function retry(kind: "document" | "assessment", id: string) {
+    setError(null);
+    try {
+      if (kind === "document") {
+        await retryDocument(id);
+      } else {
+        await retryAssessment(id);
+      }
+      await refresh();
+    } catch {
+      setError("Could not try that again just yet. Wait a moment and retry.");
+    }
+  }
+
   async function generateCumulative(kind: AssessmentKind) {
     if (!courseId) return;
     setIsGeneratingCumulative(true);
@@ -105,8 +126,21 @@ export default function Materials() {
               <div>
                 <p className="font-semibold text-navy">{document.filename}</p>
                 <p className="text-sm text-navy/60">{STATUS_LABEL[document.status]}</p>
-                {document.status === "failed" && document.error_message && (
-                  <p className="text-sm text-red-600">{document.error_message}</p>
+                {document.status === "failed" && (
+                  <>
+                    {document.error_message && (
+                      <p className="text-sm text-red-600">{document.error_message}</p>
+                    )}
+                    {document.can_retry && (
+                      <button
+                        type="button"
+                        onClick={() => retry("document", document.id)}
+                        className="mt-1 text-sm font-semibold text-gold-dark hover:underline"
+                      >
+                        Try again
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               {document.status === "completed" && (
@@ -197,8 +231,21 @@ export default function Materials() {
                   <p className="text-sm text-navy/60">
                     {KIND_LABELS[assessment.kind]} &middot; {assessment.status}
                   </p>
-                  {assessment.status === "failed" && assessment.error_message && (
-                    <p className="text-sm text-red-600">{assessment.error_message}</p>
+                  {assessment.status === "failed" && (
+                    <>
+                      {assessment.error_message && (
+                        <p className="text-sm text-red-600">{assessment.error_message}</p>
+                      )}
+                      {assessment.can_retry && (
+                        <button
+                          type="button"
+                          onClick={() => retry("assessment", assessment.id)}
+                          className="mt-1 text-sm font-semibold text-gold-dark hover:underline"
+                        >
+                          Try again
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
                 {assessment.status === "completed" && (

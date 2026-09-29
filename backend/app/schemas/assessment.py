@@ -50,6 +50,7 @@ class AssessmentRead(BaseModel):
     kind: AssessmentKind
     status: AssessmentStatus
     error_message: str | None
+    can_retry: bool
     created_at: datetime
 
 

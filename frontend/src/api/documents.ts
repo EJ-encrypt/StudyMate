@@ -8,6 +8,8 @@ export interface DocumentSummary {
   filename: string;
   status: DocumentStatus;
   error_message: string | null;
+  /** True when the failure was transient, so retrying is worth offering. */
+  can_retry: boolean;
   created_at: string;
 }
 
@@ -53,5 +55,10 @@ export async function createNotes(
     title,
     content,
   });
+  return data;
+}
+
+export async function retryDocument(documentId: string): Promise<DocumentSummary> {
+  const { data } = await apiClient.post<DocumentSummary>(`/documents/${documentId}/retry`);
   return data;
 }

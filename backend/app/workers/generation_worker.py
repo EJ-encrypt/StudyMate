@@ -15,6 +15,7 @@ from app.services.ai import get_ai_provider
 from app.services.ai.base import GeneratedItem
 from app.services.ai.base import ItemKind as ProviderItemKind
 from app.services.extraction import extract_text
+from app.services.failures import describe
 from app.services.grading import normalize
 
 # An exam paper mixes question styles, weighted towards recognition and recall
@@ -155,7 +156,8 @@ def process_assessment(assessment_id: str, count: int) -> None:
                 raise ValueError("The model returned no usable questions")
         except Exception as exc:  # noqa: BLE001 -- surfaced via assessment.error_message
             assessment.status = AssessmentStatus.FAILED
-            assessment.error_message = str(exc)
+            message, assessment.can_retry = describe(exc)
+            assessment.error_message = message
             db.commit()
             return
 

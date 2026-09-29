@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -156,5 +157,84 @@ def test_upload_rejects_course_owned_by_another_student(client: TestClient) -> N
         headers={"Authorization": f"Bearer {other_token}"},
         data={"course_id": course["id"]},
         files={"file": ("lecture1.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+    )
+    assert response.status_code == 404
+
+
+def test_retry_requeues_a_transiently_failed_document(client: TestClient, db) -> None:
+    from app.models.document import DocumentStatus, LectureDocument
+
+    token = _register_and_login(client, "retry-ok@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "OS", "code": "CS305"}, headers=headers).json()
+    me = client.get("/auth/me", headers=headers).json()
+
+    document = LectureDocument(
+        student_id=uuid.UUID(me["id"]),
+        course_id=uuid.UUID(course["id"]),
+        filename="lecture.pdf",
+        storage_path="storage/lecture.pdf",
+        status=DocumentStatus.FAILED,
+        error_message="The AI service has hit its usage limit for now.",
+        can_retry=True,
+    )
+    db.add(document)
+    db.commit()
+
+    with patch("app.api.routers.documents.queue.enqueue") as enqueue:
+        response = client.post(f"/documents/{document.id}/retry", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["error_message"] is None
+    enqueue.assert_called_once()
+
+
+def test_retry_refused_when_the_file_itself_is_the_problem(client: TestClient, db) -> None:
+    from app.models.document import DocumentStatus, LectureDocument
+
+    token = _register_and_login(client, "retry-no@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "OS", "code": "CS305"}, headers=headers).json()
+    me = client.get("/auth/me", headers=headers).json()
+
+    document = LectureDocument(
+        student_id=uuid.UUID(me["id"]),
+        course_id=uuid.UUID(course["id"]),
+        filename="scan.pdf",
+        storage_path="storage/scan.pdf",
+        status=DocumentStatus.FAILED,
+        error_message="No text could be read from this file.",
+        can_retry=False,
+    )
+    db.add(document)
+    db.commit()
+
+    response = client.post(f"/documents/{document.id}/retry", headers=headers)
+    assert response.status_code == 409
+
+
+def test_cannot_retry_another_students_document(client: TestClient, db) -> None:
+    from app.models.document import DocumentStatus, LectureDocument
+
+    owner = _register_and_login(client, "retry-owner@example.com")
+    owner_headers = {"Authorization": f"Bearer {owner}"}
+    course = client.post("/courses", json={"name": "OS", "code": "CS305"}, headers=owner_headers).json()
+    me = client.get("/auth/me", headers=owner_headers).json()
+    document = LectureDocument(
+        student_id=uuid.UUID(me["id"]),
+        course_id=uuid.UUID(course["id"]),
+        filename="lecture.pdf",
+        storage_path="storage/lecture.pdf",
+        status=DocumentStatus.FAILED,
+        can_retry=True,
+    )
+    db.add(document)
+    db.commit()
+
+    other = _register_and_login(client, "retry-other@example.com")
+    response = client.post(
+        f"/documents/{document.id}/retry", headers={"Authorization": f"Bearer {other}"}
     )
     assert response.status_code == 404

@@ -36,6 +36,9 @@ class LectureDocument(Base):
         nullable=False,
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Whether the failure was transient, so the UI can offer a retry rather
+    # than leaving the student stuck on a dead end.
+    can_retry: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     concepts: Mapped[list["KnowledgeConcept"]] = relationship(back_populates="document")

@@ -1,0 +1,84 @@
+# Single-origin deployment: the API serves the built frontend, so the whole
+# app sits behind one URL with no CORS and no separate frontend service.
+#
+#   docker compose -f docker-compose.prod.yml up --build
+#
+# Then expose it with a tunnel to get a public URL, e.g.
+#   cloudflared tunnel --url http://localhost:9000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: studymate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studymate}
+      POSTGRES_DB: studymate
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studymate"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  frontend-build:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.build
+      args:
+        # Empty: the frontend calls the same origin that served it, so no
+        # host name needs baking into the bundle.
+        VITE_API_BASE_URL: ""
+    volumes:
+      - frontend-dist:/output
+
+  backend:
+    build: ./backend
+    image: studymate-app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://studymate:${POSTGRES_PASSWORD:-studymate}@postgres:5432/studymate
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_DIST: /frontend_dist
+    ports:
+      - "9000:8000"
+    volumes:
+      - uploads:/app/storage
+      - frontend-dist:/frontend_dist:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      frontend-build:
+        condition: service_completed_successfully
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+
+  worker:
+    image: studymate-app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://studymate:${POSTGRES_PASSWORD:-studymate}@postgres:5432/studymate
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - uploads:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: rq worker studymate --url redis://redis:6379/0
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  uploads:
+  frontend-dist:

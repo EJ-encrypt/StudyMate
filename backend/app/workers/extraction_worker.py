@@ -5,6 +5,7 @@ from app.db.session import SessionLocal
 from app.models.document import DocumentStatus, KnowledgeConcept, LectureDocument
 from app.services.ai import get_ai_provider
 from app.services.extraction import extract_text
+from app.services.failures import describe
 from app.services.gamification import record_document_processed
 from app.services.knowledge_base import sync_document_concepts
 
@@ -28,7 +29,8 @@ def process_document(document_id: str) -> None:
             concepts = get_ai_provider().extract_concepts(text)
         except Exception as exc:  # noqa: BLE001 -- surfaced to the student via document.error_message
             document.status = DocumentStatus.FAILED
-            document.error_message = str(exc)
+            message, document.can_retry = describe(exc)
+            document.error_message = message
             db.commit()
             return
 

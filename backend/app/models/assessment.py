@@ -58,6 +58,7 @@ class Assessment(Base):
         nullable=False,
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    can_retry: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     items: Mapped[list["AssessmentItem"]] = relationship(

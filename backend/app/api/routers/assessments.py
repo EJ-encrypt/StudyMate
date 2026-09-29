@@ -142,6 +142,7 @@ def get_assessment(
         kind=assessment.kind,
         status=assessment.status,
         error_message=assessment.error_message,
+        can_retry=assessment.can_retry,
         created_at=assessment.created_at,
         items=[
             AssessmentItemRead(
@@ -265,3 +266,30 @@ def submit_attempt(
             for badge in new_badges
         ],
     )
+
+
+@router.post("/{assessment_id}/retry", response_model=AssessmentRead)
+def retry_assessment(
+    assessment_id: uuid.UUID,
+    count: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Assessment:
+    """Re-queue generation that failed for a transient reason."""
+    assessment = _own_assessment(db, assessment_id, current_user)
+    if assessment.status is not AssessmentStatus.FAILED:
+        raise HTTPException(status_code=409, detail="This assessment has not failed")
+    if not assessment.can_retry:
+        raise HTTPException(
+            status_code=409,
+            detail="This assessment cannot be produced by retrying.",
+        )
+
+    assessment.status = AssessmentStatus.PENDING
+    assessment.error_message = None
+    assessment.can_retry = False
+    db.commit()
+    db.refresh(assessment)
+
+    queue.enqueue(process_assessment, str(assessment.id), count)
+    return assessment

@@ -20,6 +20,7 @@ class DocumentRead(BaseModel):
     filename: str
     status: DocumentStatus
     error_message: str | None
+    can_retry: bool
     created_at: datetime
 
 

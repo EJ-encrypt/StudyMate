@@ -12,6 +12,7 @@ export interface AssessmentSummary {
   kind: AssessmentKind;
   status: AssessmentStatus;
   error_message: string | null;
+  can_retry: boolean;
   created_at: string;
 }
 
@@ -107,5 +108,10 @@ export async function submitAttempt(
   const { data } = await apiClient.post<AttemptResult>(`/assessments/${assessmentId}/attempts`, {
     answers,
   });
+  return data;
+}
+
+export async function retryAssessment(assessmentId: string): Promise<AssessmentSummary> {
+  const { data } = await apiClient.post<AssessmentSummary>(`/assessments/${assessmentId}/retry`);
   return data;
 }
