@@ -16,13 +16,18 @@ function renderApp(initialPath: string) {
 }
 
 describe("App", () => {
-  it("shows the brand in the nav", () => {
+  it("shows the login form to a signed-out visitor", () => {
     renderApp("/login");
-    expect(screen.getByText("StudyMate AI")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeInTheDocument();
+  });
+
+  it("hides the sidebar until someone is signed in", () => {
+    renderApp("/login");
+    expect(screen.queryByRole("link", { name: "My Courses" })).not.toBeInTheDocument();
   });
 
   it("redirects an unauthenticated visitor to /login when hitting a protected page", async () => {
-    renderApp("/upload");
+    renderApp("/courses");
     expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
   });
 });

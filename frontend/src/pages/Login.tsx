@@ -26,16 +26,17 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center px-4">
-      <h1 className="mb-6 text-2xl font-bold text-navy">Log in</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
+      <h1 className="mb-4 text-xl font-bold text-navy">Log in</h1>
+      <p className="mb-4 text-sm text-navy/60">StudyMate</p>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="rounded border border-navy/20 px-3 py-2"
+          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
         />
         <input
           type="password"
@@ -43,13 +44,13 @@ export default function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="rounded border border-navy/20 px-3 py-2"
+          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded bg-navy px-4 py-2 font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
+          className="rounded bg-navy px-4 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
         >
           {isSubmitting ? "Logging in..." : "Log in"}
         </button>

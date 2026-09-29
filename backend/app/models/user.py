@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,6 +28,14 @@ class User(Base):
         default=UserRole.STUDENT,
         nullable=False,
     )
+    # Academic profile, captured once at onboarding. Null until then, which is
+    # how the app knows to show the onboarding step.
+    school: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    programme: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Current level (100, 200, ...) and semester (1 or 2). Courses carry their
+    # own copies so earlier levels stay browsable after the student moves on.
+    level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")

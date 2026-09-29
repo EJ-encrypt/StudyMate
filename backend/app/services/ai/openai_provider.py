@@ -32,6 +32,7 @@ from app.services.ai.prompts import (
     concept_extraction_prompt,
     generation_prompt,
     grading_prompt,
+    course_summary_prompt,
     same_concept_prompt,
 )
 
@@ -63,6 +64,10 @@ class _ConceptVerdict(BaseModel):
 
 class _VerdictList(BaseModel):
     verdicts: list[_ConceptVerdict]
+
+
+class _CourseSummary(BaseModel):
+    summary: str
 
 
 class OpenAIProvider(AIProvider):
@@ -99,6 +104,10 @@ class OpenAIProvider(AIProvider):
             return []
         parsed = self._parse(grading_prompt(submissions), _GradeList)
         return align_grades(submissions, parsed.grades)
+
+    def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
+        parsed = self._parse(course_summary_prompt(course_name, concepts), _CourseSummary)
+        return parsed.summary.strip()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:

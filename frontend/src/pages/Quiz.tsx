@@ -45,21 +45,21 @@ export default function Quiz() {
   }
 
   if (error && !assessment) {
-    return <p className="mx-auto max-w-3xl px-4 py-8 text-red-600">{error}</p>;
+    return <p className="text-sm text-red-600">{error}</p>;
   }
   if (!assessment) {
-    return <p className="mx-auto max-w-3xl px-4 py-8 text-navy/70">Loading...</p>;
+    return <p className="text-sm text-navy/60">Loading...</p>;
   }
 
   const graded = result ? Object.fromEntries(result.answers.map((a) => [a.item_id, a])) : {};
   const isFlashcards = assessment.kind === "flashcard";
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <Link to="/materials" className="text-sm font-semibold text-gold-dark">
-        &larr; Back to Materials
+    <div>
+      <Link to="/study" className="text-sm font-semibold text-gold-dark">
+        &larr; Back to Study Engine
       </Link>
-      <h1 className="mt-2 text-2xl font-bold text-navy">{assessment.title}</h1>
+      <h1 className="mt-1 text-xl font-bold text-navy">{assessment.title}</h1>
       <p className="mt-1 text-sm text-navy/60">
         {KIND_LABELS[assessment.kind]} &middot; {assessment.items.length} items
       </p>

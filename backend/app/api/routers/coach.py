@@ -6,9 +6,16 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.course import Course
+from app.models.document import CourseConcept, KnowledgeConcept, LectureDocument
+from app.models.mastery import ConceptMastery
 from app.models.user import User
-from app.schemas.coach import CoachSummary, ConceptProgressRead
-from app.services.coaching import course_progress, recommend
+from app.schemas.coach import (
+    CoachSummary,
+    ConceptDetailRead,
+    ConceptProgressRead,
+    ConceptSourceRead,
+)
+from app.services.coaching import ConceptProgress, course_progress, recommend
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
@@ -59,4 +66,59 @@ def coach_summary(
         unpractised=by_status["unpractised"],
         recommendations=[_as_read(p) for p in recommend(progress)],
         concepts=[_as_read(p) for p in progress],
+    )
+
+
+@router.get("/concept/{concept_id}", response_model=ConceptDetailRead)
+def concept_detail(
+    concept_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ConceptDetailRead:
+    """One concept in depth: how it is going, and where it came from."""
+    concept = db.get(CourseConcept, concept_id)
+    if concept is None or concept.student_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Concept not found")
+
+    mastery = (
+        db.query(ConceptMastery)
+        .filter(
+            ConceptMastery.student_id == current_user.id,
+            ConceptMastery.course_concept_id == concept.id,
+        )
+        .first()
+    )
+
+    mentions = (
+        db.query(KnowledgeConcept, LectureDocument)
+        .join(LectureDocument, KnowledgeConcept.document_id == LectureDocument.id)
+        .filter(KnowledgeConcept.course_concept_id == concept.id)
+        .all()
+    )
+
+    progress = ConceptProgress(
+        concept_id=concept.id,
+        name=concept.name,
+        summary=concept.summary,
+        score=mastery.score if mastery else None,
+        attempts=mastery.attempts if mastery else 0,
+        correct=mastery.correct if mastery else 0,
+        last_seen_at=mastery.last_seen_at if mastery else None,
+    )
+
+    return ConceptDetailRead(
+        concept_id=concept.id,
+        course_id=concept.course_id,
+        name=concept.name,
+        summary=concept.summary,
+        score=progress.score,
+        attempts=progress.attempts,
+        correct=progress.correct,
+        status=progress.status,
+        last_seen_at=progress.last_seen_at,
+        sources=[
+            ConceptSourceRead(document_id=document.id, filename=document.filename)
+            for _, document in mentions
+        ],
+        mentions=[mention.summary for mention, _ in mentions],
     )

@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict
 class CourseCreate(BaseModel):
     name: str
     code: str
+    # Default to the student's current level/semester when omitted.
+    level: int | None = None
+    semester: int | None = None
 
 
 class CourseRead(BaseModel):
@@ -15,6 +18,10 @@ class CourseRead(BaseModel):
     name: str
     code: str
     owner_id: uuid.UUID
+    level: int
+    semester: int
+    summary: str | None = None
+    document_count: int = 0
 
 
 class CourseConceptRead(BaseModel):

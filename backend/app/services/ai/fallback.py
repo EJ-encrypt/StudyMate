@@ -98,6 +98,11 @@ class FallbackProvider(AIProvider):
     def are_same_concept(self, pairs: list[tuple[str, str]]) -> list[bool]:
         return self._first_that_works("are_same_concept", lambda p: p.are_same_concept(pairs))
 
+    def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
+        return self._first_that_works(
+            "summarise_course", lambda p: p.summarise_course(course_name, concepts)
+        )
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         raise NotImplementedError(
             "Use embed_tagged: an embedding is only meaningful alongside the model "

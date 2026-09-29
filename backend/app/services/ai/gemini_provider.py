@@ -21,6 +21,7 @@ from app.services.ai.prompts import (
     concept_extraction_prompt,
     generation_prompt,
     grading_prompt,
+    course_summary_prompt,
     same_concept_prompt,
 )
 
@@ -67,6 +68,10 @@ class _VerdictList(BaseModel):
     verdicts: list[_ConceptVerdict]
 
 
+class _CourseSummary(BaseModel):
+    summary: str
+
+
 class GeminiProvider(AIProvider):
     def __init__(self) -> None:
         self._client = genai.Client(api_key=settings.gemini_api_key)
@@ -106,6 +111,12 @@ class GeminiProvider(AIProvider):
         response = self._generate_with_retry(grading_prompt(submissions), _GradeList)
         returned = _GradeList.model_validate_json(response.text).grades
         return align_grades(submissions, returned)
+
+    def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
+        response = self._generate_with_retry(
+            course_summary_prompt(course_name, concepts), _CourseSummary
+        )
+        return _CourseSummary.model_validate_json(response.text).summary.strip()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:

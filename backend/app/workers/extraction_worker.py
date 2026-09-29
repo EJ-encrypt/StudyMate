@@ -8,6 +8,7 @@ from app.services.extraction import extract_text
 from app.services.failures import describe
 from app.services.gamification import record_document_processed
 from app.services.knowledge_base import sync_document_concepts
+from app.services.course_summary import refresh_course_summary
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,13 @@ def process_document(document_id: str) -> None:
             sync_document_concepts(db, document.id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Knowledge-base sync failed for document %s: %s", document.id, exc)
+
+        # The course overview describes the material as a whole, so it goes
+        # stale the moment a lecture is added. Also non-fatal.
+        try:
+            refresh_course_summary(db, document.student_id, document.course_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Course summary refresh failed for %s: %s", document.course_id, exc)
 
         record_document_processed(db, document.student_id)
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,15 @@ class Course(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Which level and semester this course belongs to, so My Courses can group
+    # them and a student can look back at earlier ones.
+    level: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    semester: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # An overview of what the course covers, written from the concepts
+    # extracted so far. Regenerated when the material behind it changes,
+    # which is what documents_at_summary tracks.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    documents_at_summary: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="course")

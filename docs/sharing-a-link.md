@@ -65,6 +65,13 @@ built static bundle served by the API rather than a Vite dev server, so the
 whole app lives on **one** origin and needs no CORS; uploads live on a named
 volume that survives restarts; and services restart automatically.
 
+> **Always pass `--build` after changing any code.** The production stack
+> bakes the code into the image, where development bind-mounts it live. A
+> stale production image against a database the development stack has already
+> migrated fails with `Can't locate revision identified by '00NN'` and the
+> backend restart-loops, because the image's migrations are older than the
+> database.
+
 Check it: http://localhost:9000 should load the app itself, not just the API.
 
 ### 3. Open the tunnel

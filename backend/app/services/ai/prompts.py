@@ -113,3 +113,16 @@ def same_concept_prompt(pairs: list[tuple[str, str]]) -> str:
         "Return one verdict per pair, in order, with 'pair' set to the pair number.\n\n"
         f"{rendered}"
     )
+
+
+def course_summary_prompt(course_name: str, concepts: list[tuple[str, str]]) -> str:
+    listed = "\n".join(f"- {name}: {summary}" for name, summary in concepts)
+    return (
+        "Below are the concepts extracted from a student's uploaded material for "
+        f"the course {course_name}.\n"
+        "Write a short overview, two or three sentences, of what the course covers "
+        "so far. Address the student directly. Describe only what these concepts "
+        "show - do not speculate about topics that are not listed, and do not "
+        "mention that the list came from uploads.\n\n"
+        f"{listed}"
+    )

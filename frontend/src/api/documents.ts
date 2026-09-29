@@ -35,11 +35,16 @@ export async function getDocument(documentId: string): Promise<DocumentDetail> {
   return data;
 }
 
-export async function uploadDocument(courseId: string, file: File): Promise<DocumentSummary> {
+export async function uploadDocuments(
+  courseId: string,
+  files: File[],
+): Promise<DocumentSummary[]> {
   const form = new FormData();
   form.append("course_id", courseId);
-  form.append("file", file);
-  const { data } = await apiClient.post<DocumentSummary>("/documents", form, {
+  for (const file of files) {
+    form.append("files", file);
+  }
+  const { data } = await apiClient.post<DocumentSummary[]>("/documents", form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;

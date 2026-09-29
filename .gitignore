@@ -14,9 +14,12 @@ dist/
 /frontend/vite.config.js
 /frontend/vite.config.d.ts
 
-## Env
+## Env -- never commit anything holding real keys. .env.example is the only
+## env file that belongs in the repository.
 .env
-.env.local
+.env.*
+!.env.example
+*.bak
 
 ## OS / editor
 .DS_Store

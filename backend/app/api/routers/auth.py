@@ -6,7 +6,7 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenResponse
-from app.schemas.user import UserCreate, UserRead
+from app.schemas.user import OnboardingUpdate, UserCreate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,4 +41,24 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 @router.get("/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
+
+
+@router.put("/me/onboarding", response_model=UserRead)
+def complete_onboarding(
+    payload: OnboardingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Record the student's school, programme, level and semester.
+
+    New courses default to the level and semester recorded here, so a student
+    adding a course mid-semester does not have to restate it every time.
+    """
+    current_user.school = payload.school
+    current_user.programme = payload.programme
+    current_user.level = payload.level
+    current_user.semester = payload.semester
+    db.commit()
+    db.refresh(current_user)
     return current_user

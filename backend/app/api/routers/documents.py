@@ -71,25 +71,44 @@ def _store_document(
     return document
 
 
-@router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
-async def upload_document(
+@router.post("", response_model=list[DocumentRead], status_code=status.HTTP_201_CREATED)
+async def upload_documents(
     course_id: uuid.UUID = Form(...),
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> LectureDocument:
-    safe_name = _safe_filename(file.filename or "")
-    if Path(safe_name).suffix.lower() not in SUPPORTED_EXTENSIONS:
-        supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
-        raise HTTPException(status_code=400, detail=f"Unsupported file type. Supported: {supported}")
+) -> list[LectureDocument]:
+    """Accept one or several files in a single request.
 
+    Every file is validated before anything is written, so a bad file in the
+    middle of a selection does not leave the earlier ones half-ingested.
+    """
     _require_own_course(db, course_id, current_user)
 
-    contents = await file.read()
-    if len(contents) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max 20MB)")
+    if not files:
+        raise HTTPException(status_code=400, detail="No files were uploaded")
 
-    return _store_document(db, current_user, course_id, safe_name, contents)
+    prepared: list[tuple[str, bytes]] = []
+    for upload in files:
+        safe_name = _safe_filename(upload.filename or "")
+        if Path(safe_name).suffix.lower() not in SUPPORTED_EXTENSIONS:
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise HTTPException(
+                status_code=400,
+                detail=f"{upload.filename}: unsupported file type. Supported: {supported}",
+            )
+
+        contents = await upload.read()
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=400, detail=f"{upload.filename}: too large (max 20MB)"
+            )
+        prepared.append((safe_name, contents))
+
+    return [
+        _store_document(db, current_user, course_id, name, contents)
+        for name, contents in prepared
+    ]
 
 
 @router.post("/notes", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

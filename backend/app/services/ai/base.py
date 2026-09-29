@@ -82,6 +82,10 @@ class AIProvider(ABC):
         """Mark free-text answers in one call, so a submission costs one request."""
 
     @abstractmethod
+    def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
+        """A short overview of what a course covers, from its concepts."""
+
+    @abstractmethod
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed texts for similarity comparison, in the order given."""
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { getProgress, ProgressSummary } from "../api/profile";
+import PageHeader from "../components/PageHeader";
 import { useAuth } from "../context/AuthContext";
 
 export default function Profile() {
@@ -18,8 +19,8 @@ export default function Profile() {
   const locked = progress?.badges.filter((badge) => badge.earned_at === null) ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-navy">Profile</h1>
+    <>
+      <PageHeader title="Profile" subtitle={user?.programme ?? undefined} />
 
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-navy">
         <dt className="font-semibold">Name</dt>
@@ -34,15 +35,15 @@ export default function Profile() {
 
       {progress && (
         <>
-          <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["XP", progress.xp],
               ["Day streak", progress.current_streak],
               ["Best streak", progress.longest_streak],
               ["Quizzes taken", progress.attempts],
             ].map(([label, value]) => (
-              <div key={label as string} className="rounded border border-navy/10 p-3 text-center">
-                <p className="text-2xl font-bold text-navy">{value as number}</p>
+              <div key={label as string} className="rounded border border-navy/15 bg-white p-2.5 text-center">
+                <p className="text-xl font-bold text-navy">{value as number}</p>
                 <p className="text-sm text-navy/60">{label as string}</p>
               </div>
             ))}
@@ -53,7 +54,7 @@ export default function Profile() {
             {progress.last_active_on && ` \u00b7 last studied ${progress.last_active_on}`}
           </p>
 
-          <section className="mt-8">
+          <section className="mt-5">
             <h2 className="font-semibold text-navy">
               Badges
               <span className="ml-2 text-sm font-normal text-navy/60">
@@ -81,6 +82,6 @@ export default function Profile() {
           </section>
         </>
       )}
-    </div>
+    </>
   );
 }

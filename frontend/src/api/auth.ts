@@ -16,6 +16,18 @@ export interface UserProfile {
   email: string;
   full_name: string;
   role: "student" | "lecturer";
+  /** Null until onboarding is completed, which is how the app detects it. */
+  school: string | null;
+  programme: string | null;
+  level: number | null;
+  semester: number | null;
+}
+
+export interface OnboardingDetails {
+  school: string;
+  programme: string;
+  level: number;
+  semester: number;
 }
 
 export interface TokenResponse {
@@ -35,5 +47,10 @@ export async function login(payload: LoginPayload): Promise<TokenResponse> {
 
 export async function fetchCurrentUser(): Promise<UserProfile> {
   const { data } = await apiClient.get<UserProfile>("/auth/me");
+  return data;
+}
+
+export async function completeOnboarding(details: OnboardingDetails): Promise<UserProfile> {
+  const { data } = await apiClient.put<UserProfile>("/auth/me/onboarding", details);
   return data;
 }

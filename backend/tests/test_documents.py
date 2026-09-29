@@ -30,13 +30,14 @@ def test_upload_document_enqueues_extraction_job(client: TestClient, tmp_path) -
             "/documents",
             headers=headers,
             data={"course_id": course["id"]},
-            files={"file": ("lecture1.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+            files={"files": ("lecture1.pdf", b"%PDF-1.4 fake content", "application/pdf")},
         )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["filename"] == "lecture1.pdf"
-    assert body["status"] == "pending"
+    assert len(body) == 1
+    assert body[0]["filename"] == "lecture1.pdf"
+    assert body[0]["status"] == "pending"
     mock_enqueue.assert_called_once()
 
     list_response = client.get(f"/documents?course_id={course['id']}", headers=headers)
@@ -57,11 +58,11 @@ def test_upload_accepts_every_supported_format(client: TestClient, tmp_path, fil
             "/documents",
             headers=headers,
             data={"course_id": course["id"]},
-            files={"file": (filename, b"file bytes", "application/octet-stream")},
+            files={"files": (filename, b"file bytes", "application/octet-stream")},
         )
 
     assert response.status_code == 201
-    assert response.json()["filename"] == filename
+    assert response.json()[0]["filename"] == filename
 
 
 def test_upload_rejects_unsupported_format(client: TestClient) -> None:
@@ -73,7 +74,7 @@ def test_upload_rejects_unsupported_format(client: TestClient) -> None:
         "/documents",
         headers=headers,
         data={"course_id": course["id"]},
-        files={"file": ("lecture.mp3", b"audio", "audio/mpeg")},
+        files={"files": ("lecture.mp3", b"audio", "audio/mpeg")},
     )
     assert response.status_code == 400
 
@@ -90,11 +91,11 @@ def test_upload_strips_path_traversal_from_filename(client: TestClient, tmp_path
             "/documents",
             headers=headers,
             data={"course_id": course["id"]},
-            files={"file": ("../../../evil.pdf", b"%PDF-1.4", "application/pdf")},
+            files={"files": ("../../../evil.pdf", b"%PDF-1.4", "application/pdf")},
         )
 
     assert response.status_code == 201
-    assert response.json()["filename"] == "evil.pdf"
+    assert response.json()[0]["filename"] == "evil.pdf"
     written = list(tmp_path.rglob("*evil.pdf"))
     assert len(written) == 1
     assert tmp_path in written[0].parents
@@ -156,7 +157,7 @@ def test_upload_rejects_course_owned_by_another_student(client: TestClient) -> N
         "/documents",
         headers={"Authorization": f"Bearer {other_token}"},
         data={"course_id": course["id"]},
-        files={"file": ("lecture1.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+        files={"files": ("lecture1.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     )
     assert response.status_code == 404
 
@@ -238,3 +239,57 @@ def test_cannot_retry_another_students_document(client: TestClient, db) -> None:
         f"/documents/{document.id}/retry", headers={"Authorization": f"Bearer {other}"}
     )
     assert response.status_code == 404
+
+
+def test_uploads_several_files_in_one_request(client: TestClient, tmp_path) -> None:
+    token = _register_and_login(client, "multi@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "OS", "code": "CS305"}, headers=headers).json()
+
+    with patch("app.api.routers.documents.settings.storage_dir", str(tmp_path)), patch(
+        "app.api.routers.documents.queue.enqueue"
+    ) as enqueue:
+        response = client.post(
+            "/documents",
+            headers=headers,
+            data={"course_id": course["id"]},
+            files=[
+                ("files", ("week1.pdf", b"%PDF-1.4 one", "application/pdf")),
+                ("files", ("week2.docx", b"docx bytes", "application/octet-stream")),
+                ("files", ("notes.txt", b"typed notes", "text/plain")),
+            ],
+        )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert [d["filename"] for d in body] == ["week1.pdf", "week2.docx", "notes.txt"]
+    assert enqueue.call_count == 3, "each file gets its own extraction job"
+
+
+def test_one_bad_file_rejects_the_whole_batch(client: TestClient, tmp_path) -> None:
+    """Nothing is stored unless every file passes.
+
+    Otherwise a bad file halfway through a selection would leave the earlier
+    ones ingested and the student unsure what actually landed.
+    """
+    token = _register_and_login(client, "badbatch@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    course = client.post("/courses", json={"name": "OS", "code": "CS305"}, headers=headers).json()
+
+    with patch("app.api.routers.documents.settings.storage_dir", str(tmp_path)), patch(
+        "app.api.routers.documents.queue.enqueue"
+    ) as enqueue:
+        response = client.post(
+            "/documents",
+            headers=headers,
+            data={"course_id": course["id"]},
+            files=[
+                ("files", ("good.pdf", b"%PDF-1.4", "application/pdf")),
+                ("files", ("bad.mp3", b"audio", "audio/mpeg")),
+            ],
+        )
+
+    assert response.status_code == 400
+    assert "bad.mp3" in response.json()["detail"]
+    enqueue.assert_not_called()
+    assert client.get(f"/documents?course_id={course['id']}", headers=headers).json() == []

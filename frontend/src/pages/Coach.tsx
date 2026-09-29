@@ -9,6 +9,7 @@ import {
   STATUS_STYLES,
 } from "../api/coach";
 import CourseSelect from "../components/CourseSelect";
+import PageHeader from "../components/PageHeader";
 
 function StatusBadge({ concept }: { concept: ConceptProgress }) {
   return (
@@ -47,13 +48,13 @@ export default function Coach() {
   }, [courseId]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-navy">Coach</h1>
-      <p className="mt-2 text-navy/70">
-        How well you know each concept in this course, based on the questions you have answered.
-      </p>
+    <>
+      <PageHeader
+        title="Coach"
+        subtitle="How well you know each topic, from the questions you have answered."
+      />
 
-      <div className="mt-6">
+      <div className="mb-4">
         <CourseSelect selectedCourseId={courseId} onSelect={setCourseId} />
       </div>
 
@@ -62,8 +63,8 @@ export default function Coach() {
       {summary && summary.concept_count === 0 && (
         <p className="mt-8 text-navy/70">
           No concepts yet for this course.{" "}
-          <Link to="/upload" className="font-semibold text-gold-dark">
-            Upload some material
+          <Link to="/courses" className="font-semibold text-gold-dark">
+            Add material
           </Link>{" "}
           to get started.
         </p>
@@ -71,15 +72,15 @@ export default function Coach() {
 
       {summary && summary.concept_count > 0 && (
         <>
-          <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["Strong", summary.strong],
               ["Developing", summary.developing],
               ["Needs work", summary.weak],
               ["Not practised", summary.unpractised],
             ].map(([label, value]) => (
-              <div key={label as string} className="rounded border border-navy/10 p-3 text-center">
-                <p className="text-2xl font-bold text-navy">{value as number}</p>
+              <div key={label as string} className="rounded border border-navy/15 bg-white p-2.5 text-center">
+                <p className="text-xl font-bold text-navy">{value as number}</p>
                 <p className="text-sm text-navy/60">{label as string}</p>
               </div>
             ))}
@@ -95,16 +96,23 @@ export default function Coach() {
           )}
 
           {summary.recommendations.length > 0 && (
-            <section className="mt-8 rounded border border-gold bg-gold/10 p-4">
+            <section className="mt-4 rounded border border-gold bg-gold/10 p-3">
               <h2 className="font-semibold text-navy">Revise these next</h2>
               <ol className="mt-3 flex list-decimal flex-col gap-3 pl-5">
                 {summary.recommendations.map((concept) => (
                   <li key={concept.concept_id}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-navy">{concept.name}</span>
-                      <StatusBadge concept={concept} />
-                    </div>
-                    <p className="text-sm text-navy/70">{concept.summary}</p>
+                    <Link
+                      to={`/coach/concept/${concept.concept_id}`}
+                      className="group block rounded px-1 py-0.5 hover:bg-white/60"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-navy group-hover:underline">
+                          {concept.name}
+                        </span>
+                        <StatusBadge concept={concept} />
+                      </div>
+                      <p className="text-sm text-navy/70">{concept.summary}</p>
+                    </Link>
                   </li>
                 ))}
               </ol>
@@ -118,12 +126,15 @@ export default function Coach() {
             </section>
           )}
 
-          <section className="mt-8">
+          <section className="mt-5">
             <h2 className="font-semibold text-navy">All concepts</h2>
             <ul className="mt-3 flex flex-col gap-4">
               {summary.concepts.map((concept) => (
                 <li key={concept.concept_id}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link
+                    to={`/coach/concept/${concept.concept_id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 hover:underline"
+                  >
                     <span className="font-semibold text-navy">{concept.name}</span>
                     <div className="flex items-center gap-2">
                       {concept.attempts > 0 && (
@@ -133,7 +144,7 @@ export default function Coach() {
                       )}
                       <StatusBadge concept={concept} />
                     </div>
-                  </div>
+                  </Link>
                   <div className="mt-2">
                     <MasteryBar score={concept.score} />
                   </div>
@@ -143,6 +154,6 @@ export default function Coach() {
           </section>
         </>
       )}
-    </div>
+    </>
   );
 }

@@ -44,3 +44,27 @@ export async function getCoachSummary(courseId: string): Promise<CoachSummary> {
   const { data } = await apiClient.get<CoachSummary>(`/coach/${courseId}`);
   return data;
 }
+
+export interface ConceptSource {
+  document_id: string;
+  filename: string;
+}
+
+export interface ConceptDetail {
+  concept_id: string;
+  course_id: string;
+  name: string;
+  summary: string;
+  score: number | null;
+  attempts: number;
+  correct: number;
+  status: ConceptStatus;
+  last_seen_at: string | null;
+  sources: ConceptSource[];
+  mentions: string[];
+}
+
+export async function getConceptDetail(conceptId: string): Promise<ConceptDetail> {
+  const { data } = await apiClient.get<ConceptDetail>(`/coach/concept/${conceptId}`);
+  return data;
+}

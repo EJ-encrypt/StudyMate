@@ -7,6 +7,8 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
+  /** Re-read the profile, e.g. after onboarding changes it. */
+  refresh: () => Promise<void>;
   logout: () => void;
 }
 
@@ -42,13 +44,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(email, password);
   }, [login]);
 
+  const refresh = useCallback(async () => {
+    setUser(await fetchCurrentUser());
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, refresh, logout }}>
       {children}
     </AuthContext.Provider>
   );
