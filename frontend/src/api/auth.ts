@@ -1,16 +1,5 @@
 import { apiClient } from "./client";
 
-export interface RegisterPayload {
-  email: string;
-  password: string;
-  full_name: string;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
 export interface UserProfile {
   id: string;
   email: string;
@@ -21,6 +10,9 @@ export interface UserProfile {
   programme: string | null;
   level: number | null;
   semester: number | null;
+  timezone: string;
+  notify_push: boolean;
+  notify_email: boolean;
 }
 
 export interface OnboardingDetails {
@@ -28,21 +20,22 @@ export interface OnboardingDetails {
   programme: string;
   level: number;
   semester: number;
+  timezone?: string;
 }
 
-export interface TokenResponse {
-  access_token: string;
-  token_type: string;
+export interface Preferences {
+  full_name?: string;
+  timezone?: string;
+  notify_push?: boolean;
+  notify_email?: boolean;
 }
 
-export async function register(payload: RegisterPayload): Promise<UserProfile> {
-  const { data } = await apiClient.post<UserProfile>("/auth/register", payload);
-  return data;
-}
-
-export async function login(payload: LoginPayload): Promise<TokenResponse> {
-  const { data } = await apiClient.post<TokenResponse>("/auth/login", payload);
-  return data;
+export function browserTimezone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function fetchCurrentUser(): Promise<UserProfile> {
@@ -52,5 +45,10 @@ export async function fetchCurrentUser(): Promise<UserProfile> {
 
 export async function completeOnboarding(details: OnboardingDetails): Promise<UserProfile> {
   const { data } = await apiClient.put<UserProfile>("/auth/me/onboarding", details);
+  return data;
+}
+
+export async function updatePreferences(preferences: Preferences): Promise<UserProfile> {
+  const { data } = await apiClient.patch<UserProfile>("/auth/me/preferences", preferences);
   return data;
 }

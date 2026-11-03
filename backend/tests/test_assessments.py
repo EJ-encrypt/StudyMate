@@ -2,6 +2,8 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
+
+from tests.helpers import token_for
 from sqlalchemy.orm import Session
 
 from app.models.assessment import (
@@ -12,18 +14,13 @@ from app.models.assessment import (
     ItemKind,
 )
 from app.models.document import DocumentStatus, LectureDocument
+from app.models.job import Job
 from app.services.ai.base import ShortAnswerGrade
 
 
 def _register_and_login(client: TestClient, email: str) -> str:
-    client.post(
-        "/auth/register",
-        json={"email": email, "password": "correct-horse-battery-staple", "full_name": "Test Student"},
-    )
-    return client.post(
-        "/auth/login",
-        json={"email": email, "password": "correct-horse-battery-staple"},
-    ).json()["access_token"]
+    """A Supabase-style token; the account is created on its first request."""
+    return token_for(email)
 
 
 def _course_and_document(
@@ -51,20 +48,21 @@ def test_create_assessment_enqueues_generation(client: TestClient, db: Session) 
     headers = {"Authorization": f"Bearer {_register_and_login(client, 'gen@example.com')}"}
     _, document = _course_and_document(client, db, headers)
 
-    with patch("app.api.routers.assessments.queue.enqueue") as enqueue:
-        response = client.post(
-            "/assessments",
-            headers=headers,
-            json={"document_id": str(document.id), "kind": "mcq", "count": 5},
-        )
+    response = client.post(
+        "/assessments",
+        headers=headers,
+        json={"document_id": str(document.id), "kind": "mcq", "count": 5},
+    )
 
     assert response.status_code == 201
     body = response.json()
     assert body["status"] == "pending"
     assert body["kind"] == "mcq"
     assert body["title"] == "Multiple choice - lecture.pdf"
-    enqueue.assert_called_once()
-    assert enqueue.call_args.args[2] == 5
+    jobs = db.query(Job).all()
+    assert len(jobs) == 1
+    assert jobs[0].kind == "process_assessment"
+    assert jobs[0].payload == {"assessment_id": body["id"], "count": 5}
 
 
 def test_cannot_generate_from_unprocessed_document(client: TestClient, db: Session) -> None:
@@ -359,12 +357,11 @@ def test_can_request_an_exam_paper(client: TestClient, db: Session) -> None:
     headers = {"Authorization": f"Bearer {_register_and_login(client, 'exam@example.com')}"}
     _, document = _course_and_document(client, db, headers)
 
-    with patch("app.api.routers.assessments.queue.enqueue"):
-        response = client.post(
-            "/assessments",
-            headers=headers,
-            json={"document_id": str(document.id), "kind": "exam", "count": 12},
-        )
+    response = client.post(
+        "/assessments",
+        headers=headers,
+        json={"document_id": str(document.id), "kind": "exam", "count": 12},
+    )
 
     assert response.status_code == 201
     assert response.json()["kind"] == "exam"

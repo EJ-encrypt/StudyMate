@@ -1,11 +1,48 @@
+import {
+  Award,
+  BellRing,
+  BookOpenCheck,
+  Flame,
+  Gamepad2,
+  Lock,
+  LogOut,
+  LucideIcon,
+  Medal,
+  NotebookPen,
+  Rocket,
+  Star,
+  Target,
+  Timer,
+  Trophy,
+  UploadCloud,
+  UserCircle,
+  Zap,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getProgress, ProgressSummary } from "../api/profile";
+import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
+import { Alert, Spinner, StatTile } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
+const BADGE_ICONS: Record<string, LucideIcon> = {
+  first_upload: UploadCloud,
+  first_quiz: BookOpenCheck,
+  perfect_score: Star,
+  streak_3: Flame,
+  streak_7: Rocket,
+  concept_mastered: Target,
+  ten_concepts: Medal,
+  exam_ready: Trophy,
+  first_game: Gamepad2,
+  speed_demon: Timer,
+  perfect_memory: Zap,
+  reflective: NotebookPen,
+};
+
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [progress, setProgress] = useState<ProgressSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,72 +53,89 @@ export default function Profile() {
   }, []);
 
   const earned = progress?.badges.filter((badge) => badge.earned_at !== null) ?? [];
-  const locked = progress?.badges.filter((badge) => badge.earned_at === null) ?? [];
 
   return (
     <>
-      <PageHeader title="Profile" subtitle={user?.programme ?? undefined} />
+      <PageHeader
+        icon={UserCircle}
+        title={user?.full_name ?? "Profile"}
+        subtitle={[user?.programme, user?.level ? `Level ${user.level}` : null].filter(Boolean).join(" · ") || user?.email}
+        actions={
+          <button type="button" onClick={() => void logout()} className="btn-secondary md:hidden">
+            <LogOut className="h-4 w-4" aria-hidden /> Log out
+          </button>
+        }
+      />
 
-      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-navy">
-        <dt className="font-semibold">Name</dt>
-        <dd>{user?.full_name}</dd>
-        <dt className="font-semibold">Email</dt>
-        <dd>{user?.email}</dd>
-        <dt className="font-semibold">Role</dt>
-        <dd className="capitalize">{user?.role}</dd>
-      </dl>
-
-      {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
+      {error && <Alert>{error}</Alert>}
+      {!progress && !error && <Spinner />}
 
       {progress && (
         <>
-          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              ["XP", progress.xp],
-              ["Day streak", progress.current_streak],
-              ["Best streak", progress.longest_streak],
-              ["Quizzes taken", progress.attempts],
-            ].map(([label, value]) => (
-              <div key={label as string} className="rounded border border-navy/15 bg-white p-2.5 text-center">
-                <p className="text-xl font-bold text-navy">{value as number}</p>
-                <p className="text-sm text-navy/60">{label as string}</p>
-              </div>
-            ))}
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile icon={Zap} label="XP" value={progress.xp.toLocaleString()} />
+            <StatTile icon={Flame} label="Day streak" value={progress.current_streak} />
+            <StatTile icon={Trophy} label="Best streak" value={progress.longest_streak} />
+            <StatTile icon={BookOpenCheck} label="Quizzes taken" value={progress.attempts} />
           </section>
 
           <p className="mt-3 text-sm text-navy/60">
             {progress.documents} document{progress.documents === 1 ? "" : "s"} uploaded
-            {progress.last_active_on && ` \u00b7 last studied ${progress.last_active_on}`}
+            {progress.last_active_on && ` · last studied ${progress.last_active_on}`}
           </p>
 
-          <section className="mt-5">
-            <h2 className="font-semibold text-navy">
-              Badges
-              <span className="ml-2 text-sm font-normal text-navy/60">
-                {earned.length} of {progress.badges.length}
-              </span>
+          <section className="mt-6">
+            <h2 className="section-title">
+              <Award className="h-3.5 w-3.5" aria-hidden /> Badges · {earned.length} of {progress.badges.length}
             </h2>
-
-            <ul className="mt-3 flex flex-col gap-2">
-              {earned.map((badge) => (
-                <li
-                  key={badge.code}
-                  className="rounded border border-gold bg-gold/10 p-3"
-                >
-                  <p className="font-semibold text-navy">{badge.name}</p>
-                  <p className="text-sm text-navy/70">{badge.description}</p>
-                </li>
-              ))}
-              {locked.map((badge) => (
-                <li key={badge.code} className="rounded border border-navy/10 p-3 opacity-60">
-                  <p className="font-semibold text-navy">{badge.name}</p>
-                  <p className="text-sm text-navy/70">{badge.description}</p>
-                </li>
-              ))}
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {progress.badges.map((badge) => {
+                const Icon = BADGE_ICONS[badge.code] ?? Award;
+                const unlocked = badge.earned_at !== null;
+                return (
+                  <li
+                    key={badge.code}
+                    className={[
+                      "flex flex-col items-center rounded-xl border p-3 text-center",
+                      unlocked ? "border-gold bg-gradient-to-b from-gold/15 to-white shadow-card" : "border-navy/10 bg-white/60",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "flex h-11 w-11 items-center justify-center rounded-full",
+                        unlocked ? "bg-navy text-gold" : "bg-navy/5 text-navy/30",
+                      ].join(" ")}
+                    >
+                      {unlocked ? <Icon className="h-5 w-5" aria-hidden /> : <Lock className="h-4 w-4" aria-hidden />}
+                    </span>
+                    <p className={`mt-2 text-sm font-semibold ${unlocked ? "text-navy" : "text-navy/50"}`}>{badge.name}</p>
+                    <p className="mt-0.5 text-xs text-navy/55">{badge.description}</p>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </>
       )}
+
+      <section className="mt-8">
+        <h2 className="section-title">
+          <BellRing className="h-3.5 w-3.5" aria-hidden /> Lecture reminders
+        </h2>
+        <NotificationSettings />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="section-title">Account</h2>
+        <dl className="card grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 p-4 text-sm">
+          <dt className="text-navy/55">Email</dt>
+          <dd className="truncate text-navy">{user?.email}</dd>
+          <dt className="text-navy/55">School</dt>
+          <dd className="text-navy">{user?.school ?? "—"}</dd>
+          <dt className="text-navy/55">Time zone</dt>
+          <dd className="text-navy">{user?.timezone}</dd>
+        </dl>
+      </section>
     </>
   );
 }

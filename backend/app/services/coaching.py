@@ -91,6 +91,10 @@ def record_answers(
                 last_seen_at=datetime.now(timezone.utc),
             )
             db.add(mastery)
+            # Sessions run with autoflush off, so without this a second answer
+            # on the same concept in one submission misses the pending row and
+            # inserts a duplicate, violating uq_mastery_student_concept.
+            db.flush()
             continue
 
         observation = 1.0 if was_correct else 0.0

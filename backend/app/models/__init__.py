@@ -16,3 +16,6 @@ from app.models.assessment import (  # noqa: F401
 )
 from app.models.mastery import ConceptMastery  # noqa: F401
 from app.models.gamification import EarnedBadge, StudentProgress  # noqa: F401
+from app.models.game import GameSession  # noqa: F401
+from app.models.job import Job  # noqa: F401
+from app.models.schedule import LectureSlot, PushSubscription, SentReminder  # noqa: F401

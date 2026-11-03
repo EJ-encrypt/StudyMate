@@ -126,3 +126,27 @@ def course_summary_prompt(course_name: str, concepts: list[tuple[str, str]]) -> 
         "mention that the list came from uploads.\n\n"
         f"{listed}"
     )
+
+
+def timetable_prompt(known_courses: list[tuple[str, str]], extra_text: str = "") -> str:
+    """Read a student's lecture timetable into structured weekly slots.
+
+    The student confirms every row before anything is saved, so the model is
+    told to leave out what it cannot read rather than guess at it - a missing
+    row is easy to add by hand, a wrong time silently mistimes every reminder.
+    """
+    listed = "\n".join(f"- {code}: {name}" for code, name in known_courses) or "(none yet)"
+    text_block = f"\n\nTimetable text:\n{extra_text[:MAX_INPUT_CHARS]}" if extra_text else ""
+    return (
+        "This is a university student's weekly lecture timetable. List every "
+        "recurring class session in it.\n"
+        "For each session give: 'title' (the course name or code as written), "
+        "'course_code' (the course code if one is shown, otherwise an empty string), "
+        "'day_of_week' (0 = Monday through 6 = Sunday), 'start_time' and 'end_time' "
+        "in 24-hour HH:MM, and 'venue' (room or building, or an empty string).\n"
+        "A course that meets on several days is several sessions. Skip anything "
+        "whose day or time you cannot read with confidence rather than guessing.\n"
+        "The student already has these courses; use the same code when a session "
+        f"clearly matches one:\n{listed}"
+        f"{text_block}"
+    )

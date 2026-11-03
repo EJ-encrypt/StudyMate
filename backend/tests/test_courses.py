@@ -1,16 +1,11 @@
 from fastapi.testclient import TestClient
 
+from tests.helpers import token_for
+
 
 def _register_and_login(client: TestClient, email: str) -> str:
-    client.post(
-        "/auth/register",
-        json={"email": email, "password": "correct-horse-battery-staple", "full_name": "Test Student"},
-    )
-    login_response = client.post(
-        "/auth/login",
-        json={"email": email, "password": "correct-horse-battery-staple"},
-    )
-    return login_response.json()["access_token"]
+    """A Supabase-style token; the account is created on its first request."""
+    return token_for(email)
 
 
 def test_create_and_list_own_courses(client: TestClient) -> None:

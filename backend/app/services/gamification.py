@@ -20,6 +20,9 @@ from app.services.coaching import STRONG_THRESHOLD, CONFIDENT_ATTEMPTS
 XP_PER_CORRECT_ANSWER = 10
 XP_PER_ATTEMPT = 5
 XP_PER_DOCUMENT = 15
+XP_PER_GAME = 5
+XP_PER_PERSONAL_BEST = 10
+SPEED_DEMON_SCORE = 1500
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,10 @@ BADGES: tuple[Badge, ...] = (
     Badge("concept_mastered", "Concept Mastered", "Reach a strong rating on any concept."),
     Badge("ten_concepts", "Building a Library", "Collect ten concepts in one course."),
     Badge("exam_ready", "Exam Ready", "Complete a full exam paper."),
+    Badge("first_game", "Game On", "Play your first round in the Arcade."),
+    Badge("speed_demon", "Speed Demon", "Score 1,500 or more in Beat the Clock."),
+    Badge("perfect_memory", "Perfect Memory", "Clear Concept Match without a single wrong pair."),
+    Badge("reflective", "Reflective Learner", "Write down what you learnt after a lecture."),
 )
 
 BADGES_BY_CODE = {badge.code: badge for badge in BADGES}
@@ -135,6 +142,46 @@ def record_attempt(
     if any(count >= 10 for count in per_course.values()):
         _award(db, student_id, "ten_concepts", earned)
 
+    return earned
+
+
+def record_game(
+    db: Session,
+    student_id: uuid.UUID,
+    game: str,
+    xp: int,
+    score: int,
+    mistakes: int,
+    is_personal_best: bool,
+    today: date | None = None,
+) -> tuple[int, list[Badge]]:
+    """Credit a finished Arcade round. Returns the XP awarded and any new badges.
+
+    A round counts towards the daily streak like a quiz does: the point of the
+    games is to get revision done, and a streak that ignored them would push
+    students back towards the plainer formats.
+    """
+    progress = _progress_for(db, student_id)
+    awarded = XP_PER_GAME + xp + (XP_PER_PERSONAL_BEST if is_personal_best else 0)
+    progress.xp += awarded
+    _touch_streak(progress, today or date.today())
+
+    earned: list[Badge] = []
+    _award(db, student_id, "first_game", earned)
+    if game == "beat_the_clock" and score >= SPEED_DEMON_SCORE:
+        _award(db, student_id, "speed_demon", earned)
+    if game == "concept_match" and mistakes == 0:
+        _award(db, student_id, "perfect_memory", earned)
+    if progress.current_streak >= 3:
+        _award(db, student_id, "streak_3", earned)
+    if progress.current_streak >= 7:
+        _award(db, student_id, "streak_7", earned)
+    return awarded, earned
+
+
+def record_reflection(db: Session, student_id: uuid.UUID) -> list[Badge]:
+    earned: list[Badge] = []
+    _award(db, student_id, "reflective", earned)
     return earned
 
 

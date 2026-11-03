@@ -1,3 +1,4 @@
+import { ArrowLeft, CheckCircle2, Gamepad2, RotateCw, Send, Trophy, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -8,6 +9,7 @@ import {
   KIND_LABELS,
   submitAttempt,
 } from "../api/assessments";
+import { Alert, NewBadges, Spinner } from "../components/ui";
 
 export default function Quiz() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
@@ -37,6 +39,7 @@ export default function Quiz() {
         response: responses[item.id] ?? "",
       }));
       setResult(await submitAttempt(assessmentId, answers));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setError("Could not submit your answers. Please try again.");
     } finally {
@@ -45,87 +48,133 @@ export default function Quiz() {
   }
 
   if (error && !assessment) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <Alert>{error}</Alert>;
   }
   if (!assessment) {
-    return <p className="text-sm text-navy/60">Loading...</p>;
+    return <Spinner />;
   }
 
   const graded = result ? Object.fromEntries(result.answers.map((a) => [a.item_id, a])) : {};
   const isFlashcards = assessment.kind === "flashcard";
+  const answered = assessment.items.filter((item) => (responses[item.id] ?? "").trim()).length;
+  const playable = assessment.kind === "mcq" || assessment.kind === "fill_blank";
+  const percent = result && result.total_count ? Math.round((result.correct_count / result.total_count) * 100) : 0;
 
   return (
-    <div>
-      <Link to="/study" className="text-sm font-semibold text-gold-dark">
-        &larr; Back to Study Engine
+    <div className="mx-auto max-w-3xl">
+      <Link to={`/study/${assessment.course_id}`} className="btn-ghost -ml-2 mb-2">
+        <ArrowLeft className="h-4 w-4" aria-hidden /> Back to course
       </Link>
-      <h1 className="mt-1 text-xl font-bold text-navy">{assessment.title}</h1>
+      <h1 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">{assessment.title}</h1>
       <p className="mt-1 text-sm text-navy/60">
-        {KIND_LABELS[assessment.kind]} &middot; {assessment.items.length} items
+        {KIND_LABELS[assessment.kind]} · {assessment.items.length} items
+        {isFlashcards && " · tap a card to flip it"}
       </p>
 
       {result && (
-        <div className="mt-6 rounded border border-gold bg-gold/10 p-4">
-          <p className="font-semibold text-navy">
-            Score: {result.correct_count} / {result.total_count}
-          </p>
-          {result.new_badges.length > 0 && (
-            <div className="mt-3">
-              <p className="text-sm font-semibold text-navy">Badge earned</p>
-              <ul className="mt-1 flex flex-col gap-1">
-                {result.new_badges.map((badge) => (
-                  <li key={badge.code} className="text-sm text-navy/80">
-                    <span className="font-semibold">{badge.name}</span> - {badge.description}
-                  </li>
-                ))}
-              </ul>
+        <div className="card mt-5 animate-pop overflow-hidden">
+          <div className="flex items-center gap-4 bg-navy p-4 text-white">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gold/20 text-gold">
+              <Trophy className="h-7 w-7" aria-hidden />
+            </span>
+            <div>
+              <p className="text-2xl font-bold">
+                {result.correct_count} / {result.total_count}
+              </p>
+              <p className="text-sm text-white/70">{percent}% correct</p>
             </div>
-          )}
+          </div>
+          <div className="space-y-3 p-4">
+            <NewBadges badges={result.new_badges} />
+            {playable && (
+              <Link to={`/play/${assessment.course_id}/clock`} className="btn-gold">
+                <Gamepad2 className="h-4 w-4" aria-hidden /> Race these questions in Beat the Clock
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
       {isFlashcards ? (
-        <ul className="mt-6 flex flex-col gap-3">
-          {assessment.items.map((item) => (
-            <li key={item.id} className="rounded border border-navy/10 p-4">
-              <p className="font-semibold text-navy">
-                {item.position}. {item.question}
-              </p>
-              <button
-                type="button"
-                onClick={() => setRevealed((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                className="mt-2 text-sm font-semibold text-gold-dark hover:underline"
-              >
-                {revealed[item.id] ? "Hide answer" : "Show answer"}
-              </button>
-              {revealed[item.id] && <p className="mt-2 text-navy/80">{item.answer}</p>}
-            </li>
-          ))}
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+          {assessment.items.map((item) => {
+            const flipped = !!revealed[item.id];
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => setRevealed((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                  className={[
+                    "flex min-h-[9rem] w-full flex-col justify-between rounded-xl border p-4 text-left shadow-card transition",
+                    flipped ? "border-gold bg-gold/10" : "border-navy/10 bg-white hover:border-gold/60",
+                  ].join(" ")}
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">
+                    {flipped ? "Answer" : `Card ${item.position}`}
+                  </span>
+                  <span className={flipped ? "text-navy" : "font-semibold text-navy"}>
+                    {flipped ? item.answer : item.question}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-navy/40">
+                    <RotateCw className="h-3 w-3" aria-hidden /> {flipped ? "Show question" : "Show answer"}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
-          {assessment.items.map((item) => {
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+          {assessment.items.map((item, index) => {
             const answer = graded[item.id];
             return (
-              <fieldset key={item.id} className="rounded border border-navy/10 p-4">
-                <legend className="px-1 text-sm font-semibold text-navy/60">{item.position}</legend>
-                <p className="font-semibold text-navy">{item.question}</p>
+              <fieldset
+                key={item.id}
+                className={[
+                  "card p-4",
+                  answer ? (answer.is_correct ? "border-green-300" : "border-red-300") : "",
+                ].join(" ")}
+              >
+                <legend className="sr-only">Question {index + 1}</legend>
+                <p className="flex gap-2 font-semibold text-navy">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy/5 text-xs">
+                    {index + 1}
+                  </span>
+                  {item.question}
+                </p>
 
                 {item.kind === "mcq" && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    {item.options.map((option) => (
-                      <label key={option} className="flex items-center gap-2 text-navy">
-                        <input
-                          type="radio"
-                          name={item.id}
-                          value={option}
-                          checked={responses[item.id] === option}
-                          disabled={!!result}
-                          onChange={() => setResponses((prev) => ({ ...prev, [item.id]: option }))}
-                        />
-                        {option}
-                      </label>
-                    ))}
+                  <div className="mt-3 grid gap-2">
+                    {item.options.map((option) => {
+                      const chosen = responses[item.id] === option;
+                      const isAnswer = answer && option === answer.correct_answer;
+                      return (
+                        <label
+                          key={option}
+                          className={[
+                            "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition",
+                            isAnswer
+                              ? "border-green-400 bg-green-50"
+                              : chosen && answer
+                                ? "border-red-300 bg-red-50"
+                                : chosen
+                                  ? "border-gold bg-gold/10"
+                                  : "border-navy/15 hover:border-navy/30",
+                          ].join(" ")}
+                        >
+                          <input
+                            type="radio"
+                            name={item.id}
+                            value={option}
+                            checked={chosen}
+                            disabled={!!result}
+                            onChange={() => setResponses((prev) => ({ ...prev, [item.id]: option }))}
+                            className="accent-navy"
+                          />
+                          {option}
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -136,7 +185,7 @@ export default function Quiz() {
                     disabled={!!result}
                     rows={4}
                     onChange={(e) => setResponses((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                    className="mt-3 w-full rounded border border-navy/20 px-3 py-2"
+                    className="input mt-3"
                   />
                 )}
 
@@ -147,13 +196,23 @@ export default function Quiz() {
                     value={responses[item.id] ?? ""}
                     disabled={!!result}
                     onChange={(e) => setResponses((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                    className="mt-3 w-full rounded border border-navy/20 px-3 py-2"
+                    className="input mt-3"
                   />
                 )}
 
                 {answer && (
                   <div className="mt-3 text-sm">
-                    <p className={answer.is_correct ? "font-semibold text-green-700" : "font-semibold text-red-600"}>
+                    <p
+                      className={[
+                        "flex items-center gap-1.5 font-semibold",
+                        answer.is_correct ? "text-green-700" : "text-red-600",
+                      ].join(" ")}
+                    >
+                      {answer.is_correct ? (
+                        <CheckCircle2 className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <XCircle className="h-4 w-4" aria-hidden />
+                      )}
                       {answer.is_correct ? "Correct" : "Incorrect"}
                     </p>
                     {!answer.is_correct && (
@@ -168,16 +227,18 @@ export default function Quiz() {
             );
           })}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <Alert>{error}</Alert>}
 
           {!result && (
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-fit rounded bg-navy px-4 py-2 font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
-            >
-              {isSubmitting ? "Submitting..." : "Submit answers"}
-            </button>
+            <div className="sticky bottom-20 z-10 flex items-center justify-between gap-3 rounded-xl border border-navy/10 bg-white/95 p-3 shadow-lift backdrop-blur md:bottom-4">
+              <span className="text-sm text-navy/60">
+                {answered} of {assessment.items.length} answered
+              </span>
+              <button type="submit" disabled={isSubmitting} className="btn-primary">
+                <Send className="h-4 w-4" aria-hidden />
+                {isSubmitting ? "Marking..." : "Submit answers"}
+              </button>
+            </div>
           )}
         </form>
       )}

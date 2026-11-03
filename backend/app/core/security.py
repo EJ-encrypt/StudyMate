@@ -1,32 +1,49 @@
-from datetime import datetime, timedelta, timezone
+"""Verify the access tokens Supabase Auth issues.
 
-import bcrypt
-from jose import JWTError, jwt
+Sign-up, sign-in, password resets and email confirmation all happen between
+the browser and Supabase; the API never sees a password. It only checks that
+a request carries a token Supabase signed, and reads who it belongs to.
+
+Supabase signs with one of two schemes depending on the project's age:
+asymmetric keys (ES256/RS256) published at a JWKS endpoint, which is the
+default for new projects, or a legacy shared secret (HS256). Both are
+accepted so either kind of project works without a code change.
+"""
+
+from functools import lru_cache
+from typing import Any
+
+import jwt
 
 from app.core.config import settings
 
-# bcrypt truncates silently past 72 bytes, so passwords are capped at the
-# schema boundary (see app/schemas/user.py) rather than quietly weakened here.
-MAX_PASSWORD_BYTES = 72
+_AUDIENCE = "authenticated"
+_ASYMMETRIC = ("ES256", "RS256")
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+@lru_cache
+def _jwks_client() -> jwt.PyJWKClient:
+    # Keys are cached in-process, so verification costs a network call only
+    # on a cold start or when Supabase rotates its signing key.
+    return jwt.PyJWKClient(
+        f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json",
+        cache_keys=True,
+        lifespan=3600,
+    )
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-
-def create_access_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "exp": expire}
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-
-def decode_access_token(token: str) -> str | None:
+def decode_access_token(token: str) -> dict[str, Any] | None:
+    """Return the token's claims, or None if it is not a valid Supabase token."""
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        return payload.get("sub")
-    except JWTError:
+        algorithm = jwt.get_unverified_header(token).get("alg")
+        if algorithm == "HS256":
+            if not settings.supabase_jwt_secret:
+                return None
+            key: Any = settings.supabase_jwt_secret
+        elif algorithm in _ASYMMETRIC and settings.supabase_url:
+            key = _jwks_client().get_signing_key_from_jwt(token).key
+        else:
+            return None
+        return jwt.decode(token, key, algorithms=[algorithm], audience=_AUDIENCE)
+    except (jwt.PyJWTError, jwt.PyJWKClientError):
         return None

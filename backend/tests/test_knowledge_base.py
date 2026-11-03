@@ -6,7 +6,10 @@ overlap they revealed is why an ambiguous band exists at all.
 """
 
 import uuid
+from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from sqlalchemy.orm import Session
 
@@ -292,6 +295,8 @@ def test_document_is_only_completed_after_the_knowledge_base_is_updated(client, 
     provider.extract_concepts.return_value = [ExtractedConcept(name="Deadlock", summary="Waiting.")]
 
     with patch.object(extraction_worker, "SessionLocal", return_value=db), patch.object(
+        extraction_worker, "local_copy", return_value=nullcontext("lecture.pdf")
+    ), patch.object(
         extraction_worker, "extract_text", return_value="lecture text"
     ), patch.object(extraction_worker, "get_ai_provider", return_value=provider), patch.object(
         extraction_worker, "sync_document_concepts", side_effect=record_status
@@ -349,3 +354,39 @@ def test_embedding_model_is_recorded_on_every_concept(client, db: Session) -> No
 
     concept = db.query(CourseConcept).filter(CourseConcept.course_id == course.id).one()
     assert concept.embedding_model == EMBEDDING_MODEL
+
+
+def test_too_few_embeddings_is_an_error_not_a_silent_drop(client, db: Session) -> None:
+    """Regression: the embedding API once returned one vector for a whole batch.
+
+    zip() then quietly linked only the first concept and dropped the rest from
+    the knowledge base on every upload. A count mismatch must now fail loudly.
+    """
+    _, _, document = _student_course_document(db)
+    _add_concepts(db, document, [("Deadlock", "Circular waiting."), ("Paging", "Fixed-size frames.")])
+
+    provider = _provider([[1.0, 0.0]])
+    with patch("app.services.knowledge_base.get_ai_provider", return_value=provider):
+        with pytest.raises(ValueError, match="Expected 2 embeddings, got 1"):
+            sync_document_concepts(db, document.id)
+
+
+def test_a_finished_document_queues_the_course_summary_as_its_own_job(client, db: Session) -> None:
+    """Kept out of the extraction run so one slow reply cannot breach the time limit."""
+    from app.models.job import Job
+    from app.services.ai.base import ExtractedConcept
+    from app.workers import extraction_worker
+
+    _, course, document = _student_course_document(db)
+    provider = MagicMock()
+    provider.extract_concepts.return_value = [ExtractedConcept(name="Deadlock", summary="Waiting.")]
+
+    with patch.object(extraction_worker, "SessionLocal", return_value=db), patch.object(
+        extraction_worker, "local_copy", return_value=nullcontext("lecture.pdf")
+    ), patch.object(extraction_worker, "extract_text", return_value="lecture text"), patch.object(
+        extraction_worker, "get_ai_provider", return_value=provider
+    ), patch.object(extraction_worker, "sync_document_concepts"), patch.object(db, "close"):
+        extraction_worker.process_document(str(document.id))
+
+    jobs = db.query(Job).all()
+    assert [(j.kind, j.payload["course_id"]) for j in jobs] == [("refresh_course_summary", str(course.id))]

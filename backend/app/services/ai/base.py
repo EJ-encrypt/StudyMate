@@ -49,6 +49,17 @@ class ShortAnswerGrade(BaseModel):
     feedback: str
 
 
+class TimetableEntry(BaseModel):
+    """One weekly lecture read from a timetable. No defaults, for Gemini's schema."""
+
+    title: str
+    course_code: str
+    day_of_week: int
+    start_time: str
+    end_time: str
+    venue: str
+
+
 class AIProvider(ABC):
     """Swappable LLM backend for StudyMate's AI features."""
 
@@ -98,3 +109,17 @@ class AIProvider(ABC):
         "TLB"/"Translation Lookaside Buffer", so the bands overlap. This
         adjudicates only the ambiguous middle.
         """
+
+    def read_timetable(
+        self,
+        data: bytes,
+        mime_type: str,
+        known_courses: list[tuple[str, str]],
+        extra_text: str = "",
+    ) -> list[TimetableEntry]:
+        """Read weekly lecture slots from a timetable image or PDF.
+
+        Not abstract: an adapter without multimodal input can leave it out and
+        the fallback chain simply moves on to one that has it.
+        """
+        raise NotImplementedError(f"{type(self).__name__} cannot read timetables")

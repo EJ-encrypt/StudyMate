@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci --prefix frontend",
+  "buildCommand": "npm run build --prefix frontend",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{frontend/**,docs/**,backend/tests/**,backend/storage/**,backend/.venv/**,backend/migrations/**,**/__pycache__/**,**/*.pyc}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/((?!assets/|sw.js|manifest.webmanifest|icons/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ]
+}

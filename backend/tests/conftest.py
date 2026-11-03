@@ -11,6 +11,15 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.services.storage import get_storage
+from tests.helpers import TEST_JWT_SECRET
+
+# Tokens are verified exactly as in production, against a test secret, and
+# files go to a temporary folder rather than Supabase Storage.
+settings.supabase_jwt_secret = TEST_JWT_SECRET
+settings.supabase_url = ""
+settings.supabase_service_role_key = ""
+get_storage.cache_clear()
 
 # Tests run against a dedicated <dbname>_test database: the fixtures below
 # truncate between tests and drop every table at the end, which would
@@ -58,6 +67,12 @@ def db(_create_schema) -> Session:
             session.execute(table.delete())
         session.commit()
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_storage(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_dir", str(tmp_path / "storage"))
+    yield tmp_path / "storage"
 
 
 @pytest.fixture()

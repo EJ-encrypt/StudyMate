@@ -1,6 +1,19 @@
-import { FormEvent, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Loader2,
+  NotebookPen,
+  RotateCcw,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
+import { DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { errorMessage } from "../api/client";
 import { Course, getCourse } from "../api/courses";
 import {
   DocumentSummary,
@@ -10,15 +23,39 @@ import {
   uploadDocuments,
 } from "../api/documents";
 import PageHeader from "../components/PageHeader";
+import { Alert, EmptyState, StatusPill } from "../components/ui";
 
 const ACCEPTED = ".pdf,.docx,.pptx,.txt,.md";
+const MAX_BYTES = 20 * 1024 * 1024;
 
-const STATUS_LABEL: Record<DocumentSummary["status"], string> = {
-  pending: "Queued",
-  processing: "Reading...",
-  completed: "Ready",
-  failed: "Failed",
-};
+function DocumentStatusPill({ status }: { status: DocumentSummary["status"] }) {
+  switch (status) {
+    case "pending":
+      return (
+        <StatusPill tone="grey">
+          <Clock className="h-3 w-3" aria-hidden /> Queued
+        </StatusPill>
+      );
+    case "processing":
+      return (
+        <StatusPill tone="blue">
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> Reading
+        </StatusPill>
+      );
+    case "completed":
+      return (
+        <StatusPill tone="green">
+          <CheckCircle2 className="h-3 w-3" aria-hidden /> Ready
+        </StatusPill>
+      );
+    default:
+      return (
+        <StatusPill tone="red">
+          <AlertTriangle className="h-3 w-3" aria-hidden /> Failed
+        </StatusPill>
+      );
+  }
+}
 
 type Mode = "files" | "notes";
 
@@ -28,11 +65,14 @@ export default function CourseDetail() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [mode, setMode] = useState<Mode>("files");
   const [files, setFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     if (!courseId) return;
@@ -52,10 +92,26 @@ export default function CourseDetail() {
     if (!working) return;
     const timer = setInterval(() => {
       refresh().catch(() => undefined);
-    }, 5000);
+    }, 4000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documents]);
+
+  function choose(selected: File[]) {
+    setError(null);
+    const tooBig = selected.find((file) => file.size > MAX_BYTES);
+    if (tooBig) {
+      setError(`${tooBig.name} is larger than 20MB. Split it, or export the slides as PDF.`);
+      return;
+    }
+    setFiles(selected);
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    setIsDragging(false);
+    choose(Array.from(event.dataTransfer.files));
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -66,61 +122,58 @@ export default function CourseDetail() {
     setNotice(null);
     try {
       if (mode === "files") {
-        const added = await uploadDocuments(courseId, files);
-        setNotice(`Added ${added.length} file${added.length === 1 ? "" : "s"}.`);
+        setProgress(`Uploading 0 of ${files.length}...`);
+        const added = await uploadDocuments(courseId, files, (done, total) =>
+          setProgress(`Uploading ${done} of ${total}...`),
+        );
+        setNotice(`Added ${added.length} file${added.length === 1 ? "" : "s"}. StudyMate is reading them now.`);
         setFiles([]);
-        (document.getElementById("file-input") as HTMLInputElement | null)?.value &&
-          ((document.getElementById("file-input") as HTMLInputElement).value = "");
+        if (fileInput.current) fileInput.current.value = "";
       } else {
         await createNotes(courseId, title.trim(), content);
-        setNotice("Notes saved.");
+        setNotice("Notes saved. StudyMate is reading them now.");
         setTitle("");
         setContent("");
       }
       await refresh();
-    } catch {
+    } catch (err) {
       setError(
-        mode === "files"
-          ? "Upload failed. Supported: PDF, DOCX, PPTX, TXT, MD (max 20MB each)."
-          : "Could not save those notes.",
+        errorMessage(
+          err,
+          mode === "files"
+            ? "Upload failed. Supported: PDF, DOCX, PPTX, TXT, MD (max 20MB each)."
+            : "Could not save those notes.",
+        ),
       );
     } finally {
       setIsBusy(false);
+      setProgress(null);
     }
   }
 
-  const canSubmit =
-    !isBusy && (mode === "files" ? files.length > 0 : !!title.trim() && !!content.trim());
+  const canSubmit = !isBusy && (mode === "files" ? files.length > 0 : !!title.trim() && !!content.trim());
+  const anyReady = documents.some((d) => d.status === "completed");
 
   return (
     <>
+      <Link to="/courses" className="btn-ghost -ml-2 mb-2">
+        <ArrowLeft className="h-4 w-4" aria-hidden /> All courses
+      </Link>
       <PageHeader
         title={course ? `${course.code} — ${course.name}` : "Course"}
-        subtitle={
-          course ? `Level ${course.level} · Semester ${course.semester}` : undefined
-        }
+        subtitle={course ? `Level ${course.level} · Semester ${course.semester}` : undefined}
         actions={
-          <>
-            <Link
-              to="/courses"
-              className="rounded border border-navy/20 px-3 py-1.5 text-sm font-semibold text-navy hover:bg-navy/5"
-            >
-              All courses
+          anyReady &&
+          courseId && (
+            <Link to={`/study/${courseId}`} className="btn-primary">
+              <Sparkles className="h-4 w-4" aria-hidden /> Study this course
             </Link>
-            {documents.some((d) => d.status === "completed") && courseId && (
-              <Link
-                to={`/study/${courseId}`}
-                className="rounded bg-navy px-3 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light"
-              >
-                Study this course
-              </Link>
-            )}
-          </>
+          )
         }
       />
 
-      <section className="mb-5 rounded border border-navy/15 bg-white p-3">
-        <div className="mb-3 flex gap-1" role="tablist">
+      <section className="card mb-6 p-4">
+        <div className="mb-4 inline-flex rounded-lg bg-navy/5 p-1" role="tablist">
           {(["files", "notes"] as Mode[]).map((option) => (
             <button
               key={option}
@@ -132,35 +185,57 @@ export default function CourseDetail() {
                 setError(null);
                 setNotice(null);
               }}
-              className={
-                mode === option
-                  ? "rounded bg-navy px-3 py-1 text-sm font-semibold text-gold"
-                  : "rounded border border-navy/20 px-3 py-1 text-sm font-semibold text-navy hover:bg-navy/5"
-              }
+              className={[
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition",
+                mode === option ? "bg-white text-navy shadow-sm" : "text-navy/60 hover:text-navy",
+              ].join(" ")}
             >
+              {option === "files" ? (
+                <UploadCloud className="h-4 w-4" aria-hidden />
+              ) : (
+                <NotebookPen className="h-4 w-4" aria-hidden />
+              )}
               {option === "files" ? "Upload files" : "Type notes"}
             </button>
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {mode === "files" ? (
             <>
-              <input
-                id="file-input"
-                type="file"
-                multiple
-                accept={ACCEPTED}
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-                className="rounded border border-navy/20 px-2 py-1.5 text-sm"
-              />
-              <p className="text-xs text-navy/50">
-                Select several at once. PDF, DOCX, PPTX, TXT or MD, up to 20MB each.
-              </p>
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={[
+                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition",
+                  isDragging ? "border-gold bg-gold/10" : "border-navy/15 hover:border-gold/60 hover:bg-gold/5",
+                ].join(" ")}
+              >
+                <UploadCloud className="h-8 w-8 text-gold-dark" aria-hidden />
+                <span className="mt-2 text-sm font-semibold text-navy">Drop files here, or tap to choose</span>
+                <span className="mt-0.5 text-xs text-navy/50">PDF, DOCX, PPTX, TXT or MD · up to 20MB each</span>
+                <input
+                  ref={fileInput}
+                  id="file-input"
+                  type="file"
+                  multiple
+                  accept={ACCEPTED}
+                  onChange={(e) => choose(Array.from(e.target.files ?? []))}
+                  className="sr-only"
+                />
+              </label>
               {files.length > 0 && (
-                <ul className="text-xs text-navy/70">
+                <ul className="space-y-1">
                   {files.map((file) => (
-                    <li key={file.name}>{file.name}</li>
+                    <li key={file.name} className="flex items-center gap-2 text-sm text-navy/75">
+                      <FileText className="h-4 w-4 text-navy/40" aria-hidden />
+                      <span className="truncate">{file.name}</span>
+                      <span className="text-xs text-navy/40">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                    </li>
                   ))}
                 </ul>
               )}
@@ -173,60 +248,63 @@ export default function CourseDetail() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={120}
-                className="rounded border border-navy/20 px-2 py-1.5 text-sm"
+                className="input"
               />
               <textarea
                 placeholder="Paste or type your notes..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={8}
-                className="rounded border border-navy/20 px-2 py-1.5 font-mono text-sm"
+                className="input font-mono"
               />
             </>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {notice && <p className="text-sm text-green-700">{notice}</p>}
+          {error && <Alert>{error}</Alert>}
+          {notice && <Alert kind="success">{notice}</Alert>}
 
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="w-fit rounded bg-navy px-3 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
-          >
-            {isBusy ? "Saving..." : mode === "files" ? "Upload" : "Save notes"}
+          <button type="submit" disabled={!canSubmit} className="btn-primary w-fit">
+            {isBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {isBusy ? progress ?? "Saving..." : mode === "files" ? "Upload" : "Save notes"}
           </button>
         </form>
       </section>
 
-      <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-navy/50">
-        Material ({documents.length})
+      <h2 className="section-title">
+        <FileText className="h-3.5 w-3.5" aria-hidden /> Material ({documents.length})
       </h2>
 
       {documents.length === 0 ? (
-        <p className="text-sm text-navy/60">Nothing uploaded for this course yet.</p>
+        <EmptyState icon={FileText} title="Nothing uploaded yet">
+          Upload lecture slides, PDFs or notes above. StudyMate reads them and pulls out the key concepts.
+        </EmptyState>
       ) : (
-        <ul className="divide-y divide-navy/10 rounded border border-navy/15 bg-white">
+        <ul className="card divide-y divide-navy/5">
           {documents.map((document) => (
-            <li key={document.id} className="flex items-start justify-between gap-3 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-navy">{document.filename}</p>
-                {document.status === "failed" && document.error_message ? (
-                  <p className="text-xs text-red-600">{document.error_message}</p>
-                ) : (
-                  <p className="text-xs text-navy/50">{STATUS_LABEL[document.status]}</p>
-                )}
+            <li key={document.id} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-navy/40" aria-hidden />
+                  <p className="truncate text-sm font-semibold text-navy">{document.filename}</p>
+                </div>
+                <DocumentStatusPill status={document.status} />
               </div>
-              {document.status === "failed" && document.can_retry && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await retryDocument(document.id);
-                    await refresh();
-                  }}
-                  className="whitespace-nowrap text-xs font-semibold text-gold-dark hover:underline"
-                >
-                  Try again
-                </button>
+              {document.status === "failed" && (document.error_message || document.can_retry) && (
+                <div className="ml-7 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {document.error_message && <p className="text-xs text-red-600">{document.error_message}</p>}
+                  {document.can_retry && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await retryDocument(document.id);
+                        await refresh();
+                      }}
+                      className="btn-ghost -ml-2 py-1 text-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Try again
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           ))}

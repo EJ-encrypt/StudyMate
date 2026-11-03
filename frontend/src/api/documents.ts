@@ -1,4 +1,6 @@
 import { apiClient } from "./client";
+import { runMyJobs } from "./jobs";
+import { STORAGE_BUCKET, supabase } from "../lib/supabase";
 
 export type DocumentStatus = "pending" | "processing" | "completed" | "failed";
 
@@ -35,18 +37,61 @@ export async function getDocument(documentId: string): Promise<DocumentDetail> {
   return data;
 }
 
+interface UploadTarget {
+  document_id: string;
+  filename: string;
+  original_filename: string;
+  method: "supabase" | "local";
+  path: string;
+  token: string;
+  url: string;
+}
+
+/**
+ * Upload straight to storage, then tell the API.
+ *
+ * Files do not pass through the API: Vercel rejects request bodies over
+ * 4.5MB, and lecture slides are often bigger. The API hands out a signed URL
+ * per file, the browser sends the bytes there, and only then are the
+ * documents recorded and queued for reading.
+ */
 export async function uploadDocuments(
   courseId: string,
   files: File[],
+  onProgress?: (done: number, total: number) => void,
 ): Promise<DocumentSummary[]> {
-  const form = new FormData();
-  form.append("course_id", courseId);
-  for (const file of files) {
-    form.append("files", file);
-  }
-  const { data } = await apiClient.post<DocumentSummary[]>("/documents", form, {
-    headers: { "Content-Type": "multipart/form-data" },
+  const { data: targets } = await apiClient.post<UploadTarget[]>("/documents/uploads", {
+    course_id: courseId,
+    files: files.map((file) => ({ filename: file.name, size: file.size })),
   });
+
+  let done = 0;
+  await Promise.all(
+    targets.map(async (target, index) => {
+      const file = files[index];
+      if (target.method === "supabase") {
+        if (!supabase) throw new Error("Storage is not configured");
+        const { error } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .uploadToSignedUrl(target.path, target.token, file, {
+            contentType: file.type || "application/octet-stream",
+          });
+        if (error) throw error;
+      } else {
+        await apiClient.put(target.url, file, {
+          headers: { "Content-Type": "application/octet-stream" },
+        });
+      }
+      done += 1;
+      onProgress?.(done, files.length);
+    }),
+  );
+
+  const { data } = await apiClient.post<DocumentSummary[]>("/documents/complete", {
+    course_id: courseId,
+    uploads: targets.map((t) => ({ document_id: t.document_id, filename: t.filename })),
+  });
+  runMyJobs();
   return data;
 }
 
@@ -60,10 +105,12 @@ export async function createNotes(
     title,
     content,
   });
+  runMyJobs();
   return data;
 }
 
 export async function retryDocument(documentId: string): Promise<DocumentSummary> {
   const { data } = await apiClient.post<DocumentSummary>(`/documents/${documentId}/retry`);
+  runMyJobs();
   return data;
 }

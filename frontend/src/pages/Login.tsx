@@ -1,63 +1,107 @@
-import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { LogIn } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import AuthLayout from "../components/AuthLayout";
+import { Alert } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
+function friendly(message: string): string {
+  if (/email not confirmed/i.test(message)) {
+    return "Please confirm your email first - check your inbox for the link we sent.";
+  }
+  if (/invalid login credentials/i.test(message)) return "Incorrect email or password.";
+  return message || "Could not log in. Please try again.";
+}
+
 export default function Login() {
-  const { login } = useAuth();
+  const { user, login, sendPasswordReset } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? "/courses";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user) navigate(from, { replace: true });
+  }, [user, from, navigate]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
     setIsSubmitting(true);
     try {
       await login(email, password);
-      navigate("/upload");
-    } catch {
-      setError("Incorrect email or password.");
+    } catch (err) {
+      setError(friendly((err as Error).message));
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  async function handleForgot() {
+    setError(null);
+    if (!email) {
+      setError("Type your email above first, then choose Forgot password.");
+      return;
+    }
+    try {
+      await sendPasswordReset(email);
+      setNotice(`If ${email} has an account, a reset link is on its way.`);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
-      <h1 className="mb-4 text-xl font-bold text-navy">Log in</h1>
-      <p className="mb-4 text-sm text-navy/60">StudyMate</p>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+    <AuthLayout title="Log in" subtitle="Welcome back. Pick up where you left off.">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label>
+          <span className="label">Email</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="input mt-1"
+          />
+        </label>
+        <label>
+          <span className="label">Password</span>
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="input mt-1"
+          />
+        </label>
         <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-navy px-4 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
+          type="button"
+          onClick={handleForgot}
+          className="-mt-1 w-fit text-xs font-semibold text-gold-dark hover:underline"
         >
+          Forgot password?
+        </button>
+        {error && <Alert>{error}</Alert>}
+        {notice && <Alert kind="success">{notice}</Alert>}
+        <button type="submit" disabled={isSubmitting} className="btn-primary mt-1 py-2.5">
+          <LogIn className="h-4 w-4" aria-hidden />
           {isSubmitting ? "Logging in..." : "Log in"}
         </button>
       </form>
-      <p className="mt-4 text-sm text-navy/70">
-        No account? <Link to="/register" className="font-semibold text-gold-dark">Register</Link>
+      <p className="mt-6 text-sm text-navy/70">
+        New to StudyMate?{" "}
+        <Link to="/register" className="font-semibold text-gold-dark hover:underline">
+          Create an account
+        </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }

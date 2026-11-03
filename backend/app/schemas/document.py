@@ -12,6 +12,38 @@ class NotesCreate(BaseModel):
     content: str = Field(min_length=1, max_length=200_000)
 
 
+class UploadFileSpec(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    size: int = Field(ge=0)
+
+
+class UploadRequest(BaseModel):
+    course_id: uuid.UUID
+    files: list[UploadFileSpec] = Field(min_length=1, max_length=20)
+
+
+class UploadTargetRead(BaseModel):
+    """Where and how the browser should send one file."""
+
+    document_id: uuid.UUID
+    filename: str
+    original_filename: str
+    method: str
+    path: str
+    token: str
+    url: str
+
+
+class CompletedUpload(BaseModel):
+    document_id: uuid.UUID
+    filename: str = Field(min_length=1, max_length=255)
+
+
+class UploadComplete(BaseModel):
+    course_id: uuid.UUID
+    uploads: list[CompletedUpload] = Field(min_length=1, max_length=20)
+
+
 class DocumentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

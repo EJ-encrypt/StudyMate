@@ -1,7 +1,9 @@
+import { ArrowRight, GraduationCap } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { completeOnboarding } from "../api/auth";
+import { browserTimezone, completeOnboarding } from "../api/auth";
+import { Alert } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
 const LEVELS = [100, 200, 300, 400, 500, 600];
@@ -21,7 +23,8 @@ export default function Onboarding() {
     setIsSaving(true);
     setError(null);
     try {
-      await completeOnboarding({ school, programme, level, semester });
+      // The browser's zone, so lecture reminders fire at local times.
+      await completeOnboarding({ school, programme, level, semester, timezone: browserTimezone() });
       await refresh();
       navigate("/courses");
     } catch {
@@ -34,47 +37,46 @@ export default function Onboarding() {
   const firstName = user?.full_name ? user.full_name.split(" ")[0] : "";
 
   return (
-    <div className="mx-auto max-w-lg px-5 py-8">
-      <h1 className="text-xl font-bold text-navy">
+    <div className="mx-auto max-w-lg animate-fade-in">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-navy text-gold shadow-sm">
+        <GraduationCap className="h-6 w-6" aria-hidden />
+      </span>
+      <h1 className="text-2xl font-bold tracking-tight text-navy">
         Welcome{firstName ? `, ${firstName}` : ""}
       </h1>
       <p className="mt-1 text-sm text-navy/60">
         A few details, so your courses are filed under the right level and semester.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
-        <label className="text-sm font-semibold text-navy">
-          School
+      <form onSubmit={handleSubmit} className="card mt-6 flex flex-col gap-4 p-5">
+        <label>
+          <span className="label">School</span>
           <input
             type="text"
             required
             value={school}
             onChange={(e) => setSchool(e.target.value)}
             placeholder="School of Physical and Mathematical Sciences"
-            className="mt-1 w-full rounded border border-navy/20 px-3 py-1.5 text-sm font-normal"
+            className="input mt-1"
           />
         </label>
 
-        <label className="text-sm font-semibold text-navy">
-          Programme of study
+        <label>
+          <span className="label">Programme of study</span>
           <input
             type="text"
             required
             value={programme}
             onChange={(e) => setProgramme(e.target.value)}
             placeholder="BSc Information Technology"
-            className="mt-1 w-full rounded border border-navy/20 px-3 py-1.5 text-sm font-normal"
+            className="input mt-1"
           />
         </label>
 
-        <div className="flex gap-3">
-          <label className="flex-1 text-sm font-semibold text-navy">
-            Level
-            <select
-              value={level}
-              onChange={(e) => setLevel(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-navy/20 px-3 py-1.5 text-sm font-normal"
-            >
+        <div className="grid grid-cols-2 gap-3">
+          <label>
+            <span className="label">Level</span>
+            <select value={level} onChange={(e) => setLevel(Number(e.target.value))} className="input mt-1">
               {LEVELS.map((value) => (
                 <option key={value} value={value}>
                   Level {value}
@@ -83,27 +85,20 @@ export default function Onboarding() {
             </select>
           </label>
 
-          <label className="flex-1 text-sm font-semibold text-navy">
-            Semester
-            <select
-              value={semester}
-              onChange={(e) => setSemester(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-navy/20 px-3 py-1.5 text-sm font-normal"
-            >
+          <label>
+            <span className="label">Semester</span>
+            <select value={semester} onChange={(e) => setSemester(Number(e.target.value))} className="input mt-1">
               <option value={1}>First semester</option>
               <option value={2}>Second semester</option>
             </select>
           </label>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Alert>{error}</Alert>}
 
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="w-fit rounded bg-navy px-4 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
-        >
+        <button type="submit" disabled={isSaving} className="btn-primary w-fit">
           {isSaving ? "Saving..." : "Continue"}
+          <ArrowRight className="h-4 w-4" aria-hidden />
         </button>
       </form>
     </div>

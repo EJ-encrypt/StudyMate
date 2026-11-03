@@ -1,6 +1,9 @@
+import { MailCheck, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import AuthLayout from "../components/AuthLayout";
+import { Alert } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
@@ -10,63 +13,104 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (password.length < 8) {
+      setError("Use at least 8 characters for your password.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await register(email, password, fullName);
-      navigate("/upload");
-    } catch {
-      setError("Could not register. Email may already be in use.");
+      const { needsConfirmation } = await register(email, password, fullName.trim());
+      if (needsConfirmation) setAwaitingConfirmation(true);
+      else navigate("/welcome");
+    } catch (err) {
+      const message = (err as Error).message;
+      setError(
+        /already registered/i.test(message) ? "That email already has an account. Try logging in." : message,
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  if (awaitingConfirmation) {
+    return (
+      <AuthLayout title="Check your email">
+        <div className="card flex flex-col items-center p-6 text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
+            <MailCheck className="h-6 w-6" aria-hidden />
+          </span>
+          <p className="text-sm text-navy/75">
+            We sent a confirmation link to <span className="font-semibold text-navy">{email}</span>.
+            Open it on this device to finish creating your account.
+          </p>
+          <p className="mt-3 text-xs text-navy/50">Nothing after a few minutes? Check your spam folder.</p>
+        </div>
+        <p className="mt-6 text-sm text-navy/70">
+          Already confirmed?{" "}
+          <Link to="/login" className="font-semibold text-gold-dark hover:underline">
+            Log in
+          </Link>
+        </p>
+      </AuthLayout>
+    );
+  }
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-5">
-      <h1 className="mb-4 text-xl font-bold text-navy">Create your account</h1>
-      <p className="mb-4 text-sm text-navy/60">StudyMate</p>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
-        <input
-          type="text"
-          placeholder="Full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="rounded border border-navy/20 px-3 py-1.5 text-sm"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-navy px-4 py-1.5 text-sm font-semibold text-gold hover:bg-navy-light disabled:opacity-50"
-        >
-          {isSubmitting ? "Creating account..." : "Register"}
+    <AuthLayout title="Create your account" subtitle="Free for students. Takes under a minute.">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label>
+          <span className="label">Full name</span>
+          <input
+            type="text"
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            className="input mt-1"
+          />
+        </label>
+        <label>
+          <span className="label">Email</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="input mt-1"
+          />
+        </label>
+        <label>
+          <span className="label">Password</span>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            className="input mt-1"
+          />
+          <span className="mt-1 block text-xs text-navy/50">At least 8 characters.</span>
+        </label>
+        {error && <Alert>{error}</Alert>}
+        <button type="submit" disabled={isSubmitting} className="btn-primary mt-1 py-2.5">
+          <UserPlus className="h-4 w-4" aria-hidden />
+          {isSubmitting ? "Creating account..." : "Create account"}
         </button>
       </form>
-      <p className="mt-4 text-sm text-navy/70">
-        Already have an account? <Link to="/login" className="font-semibold text-gold-dark">Log in</Link>
+      <p className="mt-6 text-sm text-navy/70">
+        Already have an account?{" "}
+        <Link to="/login" className="font-semibold text-gold-dark hover:underline">
+          Log in
+        </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }

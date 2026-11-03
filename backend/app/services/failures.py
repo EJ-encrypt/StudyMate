@@ -6,7 +6,10 @@ nothing and, in an unmoderated session, ends their attempt at the task.
 Each message here says what happened and what to do next.
 """
 
+import httpx
 from google.genai import errors
+
+from app.services.storage import FileMissing
 
 # Rate limits and busy models are the common failure on a free-tier key, and
 # they are worth retrying; a malformed document is not.
@@ -35,6 +38,38 @@ def describe(exc: Exception) -> tuple[str, bool]:
                 False,
             )
         return ("The AI service could not process this. Please try again.", True)
+
+    # Imported here: the Mistral adapter is optional, and this module is loaded
+    # by every worker.
+    from app.services.ai.mistral_provider import MistralError
+
+    if isinstance(exc, MistralError):
+        if exc.status_code == 429:
+            return (
+                "The AI service has hit its usage limit for now. Nothing is lost - "
+                "wait a minute and try again.",
+                True,
+            )
+        if exc.status_code in (401, 403):
+            return (
+                "StudyMate could not reach the AI service. This needs an "
+                "administrator to check the service configuration.",
+                False,
+            )
+        return ("The AI service could not process this. Please try again.", True)
+
+    if isinstance(exc, httpx.TimeoutException):
+        return (
+            "The AI service is responding very slowly right now. Nothing is lost - "
+            "try again in a few minutes.",
+            True,
+        )
+
+    if isinstance(exc, FileMissing):
+        return (
+            "The uploaded file could not be found. Please upload it again.",
+            False,
+        )
 
     message = str(exc)
     if "No readable text" in message:

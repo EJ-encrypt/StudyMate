@@ -66,3 +66,11 @@ def test_unknown_failure_is_retryable_and_mentions_the_researcher() -> None:
     assert can_retry
     assert "some internal detail" not in message
     assert "researcher" in message.lower()
+
+
+def test_a_timeout_is_worth_retrying() -> None:
+    import httpx
+
+    message, can_retry = describe(httpx.ReadTimeout("slow"))
+    assert can_retry is True
+    assert "slowly" in message

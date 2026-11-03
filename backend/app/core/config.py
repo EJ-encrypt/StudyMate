@@ -1,33 +1,61 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-DEFAULT_JWT_SECRET = "change-me-in-real-deployment"
-
-
 class Settings(BaseSettings):
-    # "production" refuses to start on insecure defaults. Anything reachable
-    # by other people should set it.
+    # "production" refuses to start without the settings a public deployment
+    # needs (see app/main.py). Anything reachable by other people should set it.
     environment: str = "development"
     database_url: str = "postgresql+psycopg2://studymate:studymate@localhost:5432/studymate"
-    redis_url: str = "redis://localhost:6379/0"
-    jwt_secret: str = DEFAULT_JWT_SECRET
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
     cors_origins: str = "http://localhost:5173"
+    # The public address of the app, used for links inside reminder emails and
+    # push notifications, e.g. https://studymate.vercel.app
+    app_url: str = "http://localhost:5173"
+
+    # Supabase. Auth and file storage live there; the database is its Postgres.
+    supabase_url: str = ""
+    # Only needed for projects still on the legacy shared-secret JWTs. Newer
+    # projects sign with asymmetric keys, verified against the JWKS endpoint.
+    supabase_jwt_secret: str = ""
+    # Server-side only: lets the API mint signed upload URLs and read files.
+    # Never expose it to the browser.
+    supabase_service_role_key: str = ""
+    storage_bucket: str = "lecture-files"
+    # Used when supabase_url is empty (local development and tests).
+    storage_dir: str = "storage"
+
+    # Shared secret the scheduler sends with every tick, so nobody else can
+    # trigger reminder sends or job runs.
+    cron_secret: str = ""
+
+    # Web push (VAPID). Generate once with `python -m app.scripts.vapid`.
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:admin@example.com"
+
+    # Email reminders over SMTP. A Gmail account with an app password works
+    # and, unlike most free transactional services, can send to anyone.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    email_from: str = ""
+
     # Ordered, comma-separated. The first is used; the rest are fallbacks when
     # it fails for a transient reason, which on free tiers is common.
     ai_providers: str = "gemini"
     gemini_api_key: str = ""
     openai_api_key: str = ""
+    # Free "Experiment" plan key from console.mistral.ai; the backup provider.
+    mistral_api_key: str = ""
     # Model lists are configuration, not code: providers retire models without
     # notice (gemini-2.5-flash was closed to new keys mid-project) and a wrong
-    # name should be fixable without a deploy.
-    gemini_models: str = "gemini-3.8-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+    # name should be fixable without a deploy. Lite models only: measured in
+    # November 2026, gemini-3.8-flash on the free tier answered 503/504 for
+    # minutes at a time while the lite models answered, and each failed model
+    # in the list costs up to a minute before the next is tried.
+    gemini_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
     openai_models: str = "gpt-4o-mini"
-    storage_dir: str = "storage"
-    # Where the built frontend lives. When present, the API serves it too, so
-    # the whole app is reachable on one origin.
-    frontend_dist: str = "frontend_dist"
+    mistral_models: str = "mistral-small-latest,mistral-medium-latest"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -48,8 +76,24 @@ class Settings(BaseSettings):
         return self._csv(self.openai_models)
 
     @property
+    def mistral_models_list(self) -> list[str]:
+        return self._csv(self.mistral_models)
+
+    @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def uses_supabase_storage(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_role_key)
+
+    @property
+    def push_enabled(self) -> bool:
+        return bool(self.vapid_public_key and self.vapid_private_key)
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.smtp_host and self.email_from)
 
     @property
     def cors_origins_list(self) -> list[str]:

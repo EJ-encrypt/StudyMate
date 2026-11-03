@@ -1,25 +1,15 @@
 import uuid
+from zoneinfo import available_timezones
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.core.security import MAX_PASSWORD_BYTES
 from app.models.user import UserRole
 
 
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: str
-    role: UserRole = UserRole.STUDENT
-
-    @field_validator("password")
-    @classmethod
-    def password_fits_bcrypt(cls, value: str) -> str:
-        if len(value) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        if len(value.encode("utf-8")) > MAX_PASSWORD_BYTES:
-            raise ValueError(f"Password must be at most {MAX_PASSWORD_BYTES} bytes")
-        return value
+def _valid_timezone(value: str | None) -> str | None:
+    if value is not None and value not in available_timezones():
+        raise ValueError(f"Unknown time zone {value!r}")
+    return value
 
 
 class UserRead(BaseModel):
@@ -33,6 +23,9 @@ class UserRead(BaseModel):
     programme: str | None = None
     level: int | None = None
     semester: int | None = None
+    timezone: str = "Africa/Accra"
+    notify_push: bool = True
+    notify_email: bool = True
 
     @property
     def needs_onboarding(self) -> bool:
@@ -46,3 +39,23 @@ class OnboardingUpdate(BaseModel):
     programme: str = Field(min_length=1, max_length=150)
     level: int = Field(ge=100, le=900)
     semester: int = Field(ge=1, le=2)
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    # Sent by the browser, so reminders fire in the student's own local time.
+    timezone: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str | None) -> str | None:
+        return _valid_timezone(value)
+
+
+class PreferencesUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    timezone: str | None = None
+    notify_push: bool | None = None
+    notify_email: bool | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str | None) -> str | None:
+        return _valid_timezone(value)

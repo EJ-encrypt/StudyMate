@@ -18,6 +18,10 @@ parts.
 | 5 | AI Study Coach: mastery, weak topics, recommendations | Done |
 | 6 | Gamification: XP, streaks, badges, Profile | Done |
 | 7 | Testing & evaluation | Instruments prepared; human studies outstanding |
+| + | Hosting on Vercel + Supabase, Supabase Auth | Done |
+| + | Arcade: Beat the Clock, Concept Match | Done |
+| + | Lecture timetable, AI timetable reading, reminders, after-lecture reflection | Done |
+| + | Interface redesign: icons, phone layout, installable app | Done |
 
 Out of scope, as the plan specified: audio/video transcription, plagiarism
 detection, LMS integration, non-English support.
@@ -44,6 +48,28 @@ duplicated per adapter. A student should not get noticeably different
 questions because their upload happened to land on the fallback, and the
 hard-won details in those prompts - the reference formatting, the
 fill-in-the-blank constraint - must not drift apart between copies.
+
+**A free backup provider: Mistral.** OpenAI has no free tier, so in
+November 2026 the free alternatives were compared against what StudyMate
+actually sends. Groq's free tier allows 6,000 tokens a minute, and one
+lecture is about 5,000, so it would fail constantly. OpenRouter's free tier
+allows 200 requests a day, with inconsistent structured-output support.
+Mistral's free plan allows about 500,000 tokens a minute and 1 billion a
+month, and has everything the other adapters rely on: JSON-schema output,
+its own embedding model, and image input for timetables. The cost is a
+phone-verified sign-up and a training-data setting that has to be switched
+off. The adapter talks to the REST API directly with httpx; pydantic
+schemas are flattened (references inlined, objects closed) for Mistral's
+strict mode. A provider listed in `AI_PROVIDERS` without a key is skipped
+with a warning rather than failing on every fallback.
+
+**Lite models only.** On the free tier, `gemini-3.8-flash` was measured
+answering 503 and 504 for minutes at a time while the lite models answered in
+seconds. Every model in the list costs up to a minute when it fails, so
+the list is now the two lite models. The trade-off is some quality on the
+reasoning-heavy tasks: plausible wrong options in multiple-choice questions,
+judging written answers, and deciding whether two concepts are the same. The
+instructor review in Phase 7 should look at these specifically.
 
 **Embeddings cannot fall back silently.** Two embedding models produce
 vectors with different geometry and often different dimensions, so a
@@ -106,6 +132,80 @@ encrypted at rest. This is adequate for a prototype evaluated on synthetic
 and volunteered material, and is **not** adequate for real student data at
 scale. Anyone extending this should treat encryption at rest and a
 retention policy as prerequisites, not enhancements.
+
+## Moving to serverless hosting (November 2026)
+
+The prototype originally ran as five Docker containers (Postgres, Redis, an
+RQ worker, the API and the frontend), which is too heavy for the development
+laptop and cannot be shared without a tunnel. It now runs on Vercel and
+Supabase free tiers. Each part of the old design had to change for a reason
+specific to serverless hosting:
+
+**No long-running worker, so the queue moved into Postgres.** Vercel runs
+each request as a function that stops when the response is sent, so RQ had
+nothing to run on. Jobs are now rows in a `jobs` table, claimed with
+`SELECT ... FOR UPDATE SKIP LOCKED` and a six-minute lease. The browser asks
+the API to run its own jobs straight after queueing them, and a Supabase
+`pg_cron` schedule calls the API every minute as a sweep. A function cut off
+mid-job loses its lease and the job is retried. After three attempts the
+student sees a failure with a retry button rather than a spinner that never
+ends.
+
+**Vercel's 4.5MB request limit, so uploads bypass the API.** Lecture slides
+often exceed it. The API issues a signed upload URL per file, the browser
+uploads directly to a private Supabase Storage bucket, and the API then
+records the documents. The storage path is always derived on the server from
+ids it controls, so a student can only register files under their own prefix.
+
+**Supabase Auth instead of in-house passwords.** Sign-up, email confirmation
+and password reset are handled by Supabase. The API verifies the access
+token (asymmetric keys via JWKS, or the legacy shared secret) and creates the
+StudyMate profile on a student's first request, keyed by the Supabase user
+id. Tokens for another audience, including the anon key itself, are rejected.
+
+**Supabase publishes every table, so row-level security is on everywhere.**
+Supabase's REST API exposes the `public` schema to anyone holding the anon
+key, which ships in the frontend bundle. Without row-level security, every
+student's data would be readable over the internet. Migration `0011` enables
+RLS on every table with no policies. The API connects as the table owner,
+which bypasses RLS, so it is unaffected.
+
+**Vercel's free scheduler runs once a day,** which cannot send "an hour
+before your lecture". `pg_cron` in Supabase calls the API every minute
+instead.
+
+## Games and reminders: decisions
+
+**Games use existing material and no model calls.** Beat the Clock draws its
+questions from the student's completed multiple-choice and fill-in-the-blank
+sets. Fill-in-the-blank items become four buttons, with decoys taken from
+other answers and concept names in the same course. Concept Match uses the
+course knowledge base, with the concept's name masked out of its clue. A
+round starts instantly and costs nothing against the AI quota. Scoring is
+recomputed on the server from the submitted answers. Answer times come from
+the browser and are clamped, which is enough for a personal-best table.
+
+**Only one game counts towards mastery.** Answering a timed question is
+evidence of knowing a concept, so Beat the Clock answers move mastery
+exactly as quiz answers do. Matching a name to its definition is
+recognition, a weaker signal, so Concept Match earns XP but leaves mastery
+alone.
+
+**Reminders are idempotent by construction.** A reminder stays due for a
+ten-minute window, so a late or skipped tick still sends it. A unique
+`(slot, date, kind)` row is claimed before sending, so overlapping ticks can
+never send it twice. Times are stored as wall-clock times in the student's
+time zone, which the browser reports at onboarding, so 09:00 means nine
+o'clock where the student is.
+
+**A timetable read by the AI is a proposal, not data.** A misread time would
+mistime every reminder for the semester, so nothing is saved until the
+student has reviewed and edited the rows. Unreadable rows are dropped rather
+than guessed.
+
+**Two notification channels, because neither reaches everyone.** Web push is
+instant but an iPhone only receives it from the home-screen app. Email
+(SMTP, e.g. Gmail) reaches everyone but is easier to miss.
 
 ## Where measurement changed the design
 
@@ -177,6 +277,28 @@ these passed every unit test.
    `autoflush` off the pending row was invisible to the next check,
    violating the unique constraint.
 
+9. **Mastery double-insert.** The same autoflush problem as the badges,
+   in mastery tracking: two answers about the same concept in one
+   submission, for a student with no record on it yet, both tried to create
+   the record, and the submission failed. A quiz with two questions on one
+   topic could trigger it. The first Beat the Clock test found it.
+10. **The embedding API changed underneath the knowledge base.** Measured
+    in November 2026, `gemini-embedding-2` returned *one* vector for a list
+    of texts, combining them into a single input. The merge code paired
+    concepts with vectors using `zip`, which stops at the shorter list
+    without complaint, so every upload kept its first concept and silently
+    dropped the rest. Ten concepts were extracted and one reached the
+    knowledge base. Nothing failed and nothing was logged, and every unit
+    test passed, because the tests stub the embedding call. Each text is now
+    sent as its own content item, and a count mismatch is an error. Found
+    only by running a real upload end to end.
+11. **Unbounded model calls.** The Gemini SDK sets no request timeout. On a
+    congested free-tier model, single calls were measured taking over four
+    minutes, longer than a Vercel function may run. Requests now time out
+    after 60 seconds, and a timed-out model is skipped for the next one
+    rather than retried. The course overview, the slowest call and the least
+    important, moved into a separate job.
+
 **Free-tier reliability deserves its own mention.** Measured against a live
 key, most Gemini Flash models returned 503 "high demand" simultaneously,
 while a lite variant answered normally; one raised a bare `ConnectionError`
@@ -187,8 +309,16 @@ failures and record them as infrastructure events, not usability defects.
 
 ## Verification performed
 
-- 113 automated backend tests, run against live PostgreSQL.
-- Frontend builds clean and its test suite passes.
+- 206 automated backend tests, run against live PostgreSQL, including the
+  job queue, Supabase token verification, the upload flow, games,
+  timetable reading, reminder timing and idempotency, and the Mistral
+  adapter against recorded API responses.
+- Frontend type-checks and builds clean; 10 component tests, including the
+  navigation and the Concept Match game.
+- The full student journey, run through the Vercel entry point against a
+  fresh database migrated from scratch, with real Gemini calls: sign-up,
+  upload, concept extraction, knowledge base, MCQ generation, both games,
+  AI timetable reading from an image, reflection, and the scheduler tick.
 - Every phase exercised end to end against the live Gemini API: multi-format
   upload, concept extraction, all five assessment kinds, deterministic and
   LLM marking, cumulative de-duplication across two overlapping lectures,

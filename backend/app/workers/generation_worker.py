@@ -17,6 +17,7 @@ from app.services.ai.base import ItemKind as ProviderItemKind
 from app.services.extraction import extract_text
 from app.services.failures import describe
 from app.services.grading import normalize
+from app.services.storage import local_copy
 
 # An exam paper mixes question styles, weighted towards recognition and recall
 # with a couple of written answers, in the order a paper would present them.
@@ -129,7 +130,8 @@ def _source_text(db: Session, assessment: Assessment) -> str:
     if document is None:
         raise ValueError("Source document no longer exists")
 
-    text = extract_text(document.storage_path)
+    with local_copy(document.storage_path) as path:
+        text = extract_text(path)
     if not text.strip():
         raise ValueError("No readable text found in the source document")
     return text

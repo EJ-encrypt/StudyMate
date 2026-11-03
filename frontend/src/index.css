@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-slate-50 font-sans text-navy antialiased;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-navy text-gold shadow-sm hover:bg-navy-light;
+  }
+  .btn-gold {
+    @apply btn bg-gold text-navy shadow-sm hover:bg-gold-light;
+  }
+  .btn-secondary {
+    @apply btn border border-navy/15 bg-white text-navy hover:border-navy/30 hover:bg-navy/5;
+  }
+  .btn-ghost {
+    @apply btn px-2 text-navy/70 hover:bg-navy/5 hover:text-navy;
+  }
+  .card {
+    @apply rounded-xl border border-navy/10 bg-white shadow-card;
+  }
+  .input {
+    @apply w-full rounded-lg border border-navy/20 bg-white px-3 py-2 text-sm text-navy placeholder:text-navy/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/30;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-navy/60;
+  }
+  .section-title {
+    @apply mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy/50;
+  }
+}
+
+/* Leaves room for the phone's home indicator under the bottom tab bar. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

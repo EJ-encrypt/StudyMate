@@ -286,3 +286,56 @@ def test_reports_unmarked_when_counts_do_not_line_up(provider: GeminiProvider) -
 def test_no_submissions_makes_no_call(provider: GeminiProvider) -> None:
     assert provider.grade_short_answers([]) == []
     provider._client.models.generate_content.assert_not_called()
+
+
+def _embedding(values: list[float]) -> MagicMock:
+    embedding = MagicMock()
+    embedding.values = values
+    return embedding
+
+
+def test_embed_sends_each_text_as_its_own_content(provider: GeminiProvider) -> None:
+    """A bare list of strings is embedded as ONE input; each text needs its own Content."""
+    provider._client.models.embed_content.return_value = MagicMock(
+        embeddings=[_embedding([1.0]), _embedding([2.0])]
+    )
+
+    assert provider.embed(["first", "second"]) == [[1.0], [2.0]]
+
+    contents = provider._client.models.embed_content.call_args.kwargs["contents"]
+    assert len(contents) == 2
+    assert [content.parts[0].text for content in contents] == ["first", "second"]
+
+
+def test_embed_rejects_a_short_response(provider: GeminiProvider) -> None:
+    provider._client.models.embed_content.return_value = MagicMock(embeddings=[_embedding([1.0])])
+    with pytest.raises(ValueError, match="2 texts but got 1"):
+        provider.embed(["first", "second"])
+
+
+def test_a_model_that_times_out_is_skipped_not_retried(provider: GeminiProvider) -> None:
+    """A stalled model must not eat the function's time budget twice over."""
+    import httpx
+
+    ok = MagicMock(text='{"concepts": []}')
+    provider._client.models.generate_content.side_effect = [httpx.ReadTimeout("slow"), ok]
+
+    with patch.object(gemini_module.time, "sleep") as sleep:
+        provider.extract_concepts("text")
+
+    models_tried = [c.kwargs["model"] for c in provider._client.models.generate_content.call_args_list]
+    assert models_tried == ["model-a", "model-b"]
+    sleep.assert_not_called()
+
+
+def test_a_server_side_timeout_falls_back_immediately(provider: GeminiProvider) -> None:
+    """504 arrives after the full request timeout; asking again wastes another one."""
+    ok = MagicMock(text='{"concepts": []}')
+    provider._client.models.generate_content.side_effect = [_api_error(504), ok]
+
+    with patch.object(gemini_module.time, "sleep") as sleep:
+        provider.extract_concepts("text")
+
+    models_tried = [c.kwargs["model"] for c in provider._client.models.generate_content.call_args_list]
+    assert models_tried == ["model-a", "model-b"]
+    sleep.assert_not_called()

@@ -1,3 +1,4 @@
+import { BookOpen, Plus } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { Course, createCourse, listCourses } from "../api/courses";
@@ -5,9 +6,11 @@ import { Course, createCourse, listCourses } from "../api/courses";
 interface CourseSelectProps {
   selectedCourseId: string | null;
   onSelect: (courseId: string) => void;
+  /** Hide the inline "new course" form where creating one makes no sense. */
+  allowCreate?: boolean;
 }
 
-export default function CourseSelect({ selectedCourseId, onSelect }: CourseSelectProps) {
+export default function CourseSelect({ selectedCourseId, onSelect, allowCreate = true }: CourseSelectProps) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [name, setName] = useState("");
@@ -34,36 +37,37 @@ export default function CourseSelect({ selectedCourseId, onSelect }: CourseSelec
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <label className="text-sm font-semibold text-navy">Course</label>
-      <select
-        value={selectedCourseId ?? ""}
-        onChange={(e) => onSelect(e.target.value)}
-        className="rounded border border-navy/20 px-3 py-1.5"
-      >
-        {courses.length === 0 && <option value="">No courses yet</option>}
-        {courses.map((course) => (
-          <option key={course.id} value={course.id}>
-            {course.code} - {course.name}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        onClick={() => setIsCreating((prev) => !prev)}
-        className="text-sm font-semibold text-gold-dark hover:underline"
-      >
-        + New course
-      </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="relative flex min-w-0 flex-1 items-center sm:max-w-sm">
+        <span className="sr-only">Course</span>
+        <BookOpen className="pointer-events-none absolute left-3 h-4 w-4 text-navy/40" aria-hidden />
+        <select
+          value={selectedCourseId ?? ""}
+          onChange={(e) => onSelect(e.target.value)}
+          className="input pl-9 font-medium"
+        >
+          {courses.length === 0 && <option value="">No courses yet</option>}
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.code} - {course.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {allowCreate && (
+        <button type="button" onClick={() => setIsCreating((prev) => !prev)} className="btn-ghost text-gold-dark">
+          <Plus className="h-4 w-4" aria-hidden /> New course
+        </button>
+      )}
       {isCreating && (
-        <form onSubmit={handleCreate} className="flex flex-wrap items-center gap-2">
+        <form onSubmit={handleCreate} className="flex w-full flex-wrap items-center gap-2">
           <input
             type="text"
             placeholder="Code (e.g. CS201)"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
-            className="w-32 rounded border border-navy/20 px-2 py-1 text-sm"
+            className="input w-36"
           />
           <input
             type="text"
@@ -71,9 +75,9 @@ export default function CourseSelect({ selectedCourseId, onSelect }: CourseSelec
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="w-48 rounded border border-navy/20 px-2 py-1 text-sm"
+            className="input w-56"
           />
-          <button type="submit" className="rounded bg-navy px-3 py-1 text-sm font-semibold text-gold">
+          <button type="submit" className="btn-primary">
             Create
           </button>
         </form>

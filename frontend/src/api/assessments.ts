@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { runMyJobs } from "./jobs";
 
 export type ItemKind = "flashcard" | "mcq" | "fill_blank" | "short_answer";
 export type AssessmentKind = ItemKind | "exam";
@@ -72,6 +73,7 @@ export async function createAssessment(
     kind,
     count,
   });
+  runMyJobs();
   return data;
 }
 
@@ -86,6 +88,7 @@ export async function createCumulativeAssessment(
     kind,
     count,
   });
+  runMyJobs();
   return data;
 }
 
@@ -113,5 +116,6 @@ export async function submitAttempt(
 
 export async function retryAssessment(assessmentId: string): Promise<AssessmentSummary> {
   const { data } = await apiClient.post<AssessmentSummary>(`/assessments/${assessmentId}/retry`);
+  runMyJobs();
   return data;
 }

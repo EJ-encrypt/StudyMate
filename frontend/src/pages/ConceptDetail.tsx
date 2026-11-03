@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -9,6 +10,7 @@ import {
 } from "../api/assessments";
 import { ConceptDetail as ConceptDetailData, STATUS_LABELS, STATUS_STYLES, getConceptDetail } from "../api/coach";
 import PageHeader from "../components/PageHeader";
+import { Alert, Spinner, StatTile } from "../components/ui";
 
 const PRACTICE_KINDS: AssessmentKind[] = ["flashcard", "mcq", "short_answer"];
 
@@ -50,59 +52,41 @@ export default function ConceptDetail() {
   }
 
   if (error && !concept) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <Alert>{error}</Alert>;
   }
   if (!concept) {
-    return <p className="text-sm text-navy/60">Loading...</p>;
+    return <Spinner />;
   }
 
   const percent = concept.score === null ? null : Math.round(concept.score * 100);
 
   return (
     <>
+      <Link to="/coach" className="btn-ghost -ml-2 mb-2">
+        <ArrowLeft className="h-4 w-4" aria-hidden /> Back to Coach
+      </Link>
       <PageHeader
         title={concept.name}
         subtitle={
-          <span className={`rounded px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[concept.status]}`}>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[concept.status]}`}>
             {STATUS_LABELS[concept.status]}
           </span>
         }
-        actions={
-          <Link
-            to="/coach"
-            className="rounded border border-navy/20 px-3 py-1.5 text-sm font-semibold text-navy hover:bg-navy/5"
-          >
-            Back to Coach
-          </Link>
-        }
       />
 
-      <section className="mb-4 rounded border border-navy/15 bg-white p-3">
+      <section className="mb-4 card p-4">
         <h2 className="text-xs font-bold uppercase tracking-wide text-navy/50">What this is</h2>
         <p className="mt-1 text-sm text-navy/80">{concept.summary}</p>
       </section>
 
-      <section className="mb-4 grid gap-2 sm:grid-cols-3">
-        <div className="rounded border border-navy/15 bg-white p-3 text-center">
-          <p className="text-xl font-bold text-navy">{percent === null ? "—" : `${percent}%`}</p>
-          <p className="text-xs text-navy/60">Mastery</p>
-        </div>
-        <div className="rounded border border-navy/15 bg-white p-3 text-center">
-          <p className="text-xl font-bold text-navy">
-            {concept.correct}/{concept.attempts}
-          </p>
-          <p className="text-xs text-navy/60">Answered correctly</p>
-        </div>
-        <div className="rounded border border-navy/15 bg-white p-3 text-center">
-          <p className="text-xl font-bold text-navy">{concept.sources.length}</p>
-          <p className="text-xs text-navy/60">
-            Source {concept.sources.length === 1 ? "file" : "files"}
-          </p>
-        </div>
+      <section className="mb-4 grid grid-cols-3 gap-3">
+        <StatTile label="Mastery" value={percent === null ? "—" : `${percent}%`} />
+        <StatTile label="Correct" value={`${concept.correct}/${concept.attempts}`} />
+        <StatTile label={`Source ${concept.sources.length === 1 ? "file" : "files"}`} value={concept.sources.length} />
       </section>
 
       {concept.mentions.length > 0 && (
-        <section className="mb-4 rounded border border-navy/15 bg-white p-3">
+        <section className="mb-4 card p-4">
           <h2 className="text-xs font-bold uppercase tracking-wide text-navy/50">
             How your material puts it
           </h2>
@@ -119,7 +103,7 @@ export default function ConceptDetail() {
         </section>
       )}
 
-      <section className="rounded border border-gold bg-gold/10 p-3">
+      <section className="rounded-xl border border-gold bg-gold/10 p-4">
         <h2 className="text-xs font-bold uppercase tracking-wide text-navy/60">
           Practise this
         </h2>
@@ -135,7 +119,7 @@ export default function ConceptDetail() {
               type="button"
               disabled={isBusy}
               onClick={() => practise(kind)}
-              className="rounded border border-navy/25 bg-white px-3 py-1.5 text-sm font-semibold text-navy hover:border-navy disabled:opacity-50"
+              className="btn-secondary"
             >
               {KIND_LABELS[kind]}
             </button>

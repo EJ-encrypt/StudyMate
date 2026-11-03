@@ -1,3 +1,4 @@
+import { Lightbulb, ListTree, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,10 +11,11 @@ import {
 } from "../api/coach";
 import CourseSelect from "../components/CourseSelect";
 import PageHeader from "../components/PageHeader";
+import { Alert, EmptyState, StatTile } from "../components/ui";
 
 function StatusBadge({ concept }: { concept: ConceptProgress }) {
   return (
-    <span className={`rounded px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[concept.status]}`}>
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[concept.status]}`}>
       {STATUS_LABELS[concept.status]}
     </span>
   );
@@ -21,13 +23,13 @@ function StatusBadge({ concept }: { concept: ConceptProgress }) {
 
 function MasteryBar({ score }: { score: number | null }) {
   if (score === null) {
-    return <div className="h-2 w-full rounded bg-navy/10" />;
+    return <div className="h-2 w-full rounded-full bg-navy/10" />;
   }
   const percent = Math.round(score * 100);
   const colour = score < 0.5 ? "bg-red-500" : score < 0.8 ? "bg-gold" : "bg-green-600";
   return (
-    <div className="h-2 w-full rounded bg-navy/10">
-      <div className={`h-2 rounded ${colour}`} style={{ width: `${percent}%` }} />
+    <div className="h-2 w-full rounded-full bg-navy/10">
+      <div className={`h-2 rounded-full ${colour} transition-all`} style={{ width: `${percent}%` }} />
     </div>
   );
 }
@@ -50,6 +52,7 @@ export default function Coach() {
   return (
     <>
       <PageHeader
+        icon={Target}
         title="Coach"
         subtitle="How well you know each topic, from the questions you have answered."
       />
@@ -58,16 +61,20 @@ export default function Coach() {
         <CourseSelect selectedCourseId={courseId} onSelect={setCourseId} />
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       {summary && summary.concept_count === 0 && (
-        <p className="mt-8 text-navy/70">
-          No concepts yet for this course.{" "}
-          <Link to="/courses" className="font-semibold text-gold-dark">
-            Add material
-          </Link>{" "}
-          to get started.
-        </p>
+        <EmptyState
+          icon={Target}
+          title="No concepts yet for this course"
+          action={
+            <Link to="/courses" className="btn-primary">
+              Add material
+            </Link>
+          }
+        >
+          Once your material is processed, the Coach tracks how well you know every topic in it.
+        </EmptyState>
       )}
 
       {summary && summary.concept_count > 0 && (
@@ -79,10 +86,7 @@ export default function Coach() {
               ["Needs work", summary.weak],
               ["Not practised", summary.unpractised],
             ].map(([label, value]) => (
-              <div key={label as string} className="rounded border border-navy/15 bg-white p-2.5 text-center">
-                <p className="text-xl font-bold text-navy">{value as number}</p>
-                <p className="text-sm text-navy/60">{label as string}</p>
-              </div>
+              <StatTile key={label as string} label={label as string} value={value as number} />
             ))}
           </section>
 
@@ -96,8 +100,10 @@ export default function Coach() {
           )}
 
           {summary.recommendations.length > 0 && (
-            <section className="mt-4 rounded border border-gold bg-gold/10 p-3">
-              <h2 className="font-semibold text-navy">Revise these next</h2>
+            <section className="mt-5 rounded-xl border border-gold bg-gradient-to-br from-gold/15 to-gold/5 p-4">
+              <h2 className="flex items-center gap-2 font-semibold text-navy">
+                <Lightbulb className="h-4 w-4 text-gold-dark" aria-hidden /> Revise these next
+              </h2>
               <ol className="mt-3 flex list-decimal flex-col gap-3 pl-5">
                 {summary.recommendations.map((concept) => (
                   <li key={concept.concept_id}>
@@ -126,9 +132,11 @@ export default function Coach() {
             </section>
           )}
 
-          <section className="mt-5">
-            <h2 className="font-semibold text-navy">All concepts</h2>
-            <ul className="mt-3 flex flex-col gap-4">
+          <section className="mt-6">
+            <h2 className="section-title">
+              <ListTree className="h-3.5 w-3.5" aria-hidden /> All concepts
+            </h2>
+            <ul className="card flex flex-col gap-4 p-4">
               {summary.concepts.map((concept) => (
                 <li key={concept.concept_id}>
                   <Link

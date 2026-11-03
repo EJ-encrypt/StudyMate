@@ -2,6 +2,7 @@ import logging
 import random
 import time
 
+import httpx
 import requests
 from google import genai
 from google.genai import errors, types
@@ -16,6 +17,7 @@ from app.services.ai.base import (
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
+    TimetableEntry,
 )
 from app.services.ai.prompts import (
     concept_extraction_prompt,
@@ -23,6 +25,7 @@ from app.services.ai.prompts import (
     grading_prompt,
     course_summary_prompt,
     same_concept_prompt,
+    timetable_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +48,7 @@ _EMBEDDING_DIM = 768
 # backoff cannot fix, so it is handled by _QUOTA_COOLDOWN below instead of by
 # retrying. Without any retries one blip permanently fails a student's upload.
 _RETRYABLE_STATUS = frozenset({500, 502, 503, 504})
+_GATEWAY_TIMEOUT_STATUS = 504
 _QUOTA_EXHAUSTED_STATUS = 429
 _ATTEMPTS_PER_MODEL = 2
 _BACKOFF_BASE_SECONDS = 2.0
@@ -56,6 +60,13 @@ _BACKOFF_BASE_SECONDS = 2.0
 # that a spent daily quota is only re-probed once a minute.
 _QUOTA_COOLDOWN_SECONDS = 60.0
 _quota_cooldown_until: dict[str, float] = {}
+
+# Per request. Without one the SDK waits indefinitely, and measured against a
+# congested free-tier model in November 2026 a single generateContent call sat
+# for over four minutes before answering - longer than Vercel lets a function
+# run at all. A healthy reply takes 10-45s. A model that has not answered in a
+# minute is treated as overloaded and the next model is tried instead.
+_REQUEST_TIMEOUT_SECONDS = 60
 
 
 class _ConceptList(BaseModel):
@@ -83,9 +94,16 @@ class _CourseSummary(BaseModel):
     summary: str
 
 
+class _Timetable(BaseModel):
+    entries: list[TimetableEntry]
+
+
 class GeminiProvider(AIProvider):
     def __init__(self) -> None:
-        self._client = genai.Client(api_key=settings.gemini_api_key)
+        self._client = genai.Client(
+            api_key=settings.gemini_api_key,
+            http_options=types.HttpOptions(timeout=_REQUEST_TIMEOUT_SECONDS * 1000),
+        )
         self._models = settings.gemini_models_list
 
     @property
@@ -132,12 +150,20 @@ class GeminiProvider(AIProvider):
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
+        # One Content per text. Passed as a bare list of strings, the API now
+        # treats them as parts of a single input and returns ONE embedding for
+        # the lot - measured in November 2026: 3 texts in, 1 vector out - which
+        # silently left all but the first concept of every upload out of the
+        # knowledge base.
         result = self._client.models.embed_content(
             model=_EMBEDDING_MODEL,
-            contents=texts,
+            contents=[types.Content(parts=[types.Part(text=text)]) for text in texts],
             config={"output_dimensionality": _EMBEDDING_DIM},
         )
-        return [embedding.values for embedding in result.embeddings]
+        vectors = [embedding.values for embedding in result.embeddings]
+        if len(vectors) != len(texts):
+            raise ValueError(f"Asked to embed {len(texts)} texts but got {len(vectors)} vectors")
+        return vectors
 
     def are_same_concept(self, pairs: list[tuple[str, str]]) -> list[bool]:
         if not pairs:
@@ -156,8 +182,20 @@ class GeminiProvider(AIProvider):
             results.append(by_number.get(index, False))
         return results
 
+    def read_timetable(
+        self,
+        data: bytes,
+        mime_type: str,
+        known_courses: list[tuple[str, str]],
+        extra_text: str = "",
+    ) -> list[TimetableEntry]:
+        contents: list = [timetable_prompt(known_courses, extra_text)]
+        if data:
+            contents.insert(0, types.Part.from_bytes(data=data, mime_type=mime_type))
+        response = self._generate_with_retry(contents, _Timetable)
+        return _Timetable.model_validate_json(response.text).entries
 
-    def _generate_with_retry(self, prompt: str, schema: type[BaseModel]):
+    def _generate_with_retry(self, prompt: str | list, schema: type[BaseModel]):
         """Retry transient failures, then fall back to the next model.
 
         Models whose quota is spent are skipped outright rather than retried:
@@ -195,11 +233,26 @@ class GeminiProvider(AIProvider):
                             _QUOTA_COOLDOWN_SECONDS,
                         )
                         break
+                    if exc.code == _GATEWAY_TIMEOUT_STATUS:
+                        # The SDK tells the server our timeout, and the server
+                        # answers 504 when it runs out: this model just spent
+                        # the whole minute. Same treatment as a client timeout.
+                        last_error = exc
+                        logger.warning("%s timed out server-side (HTTP 504); falling back", model)
+                        break
                     if exc.code not in _RETRYABLE_STATUS:
                         raise
                     last_error = exc
                     reason = f"HTTP {exc.code}"
-                except requests.exceptions.RequestException as exc:
+                except httpx.TimeoutException as exc:
+                    # Waiting another minute on the same overloaded model is the
+                    # slowest possible way to fail; move on to the next one.
+                    last_error = exc
+                    logger.warning(
+                        "%s did not answer within %ss; falling back", model, _REQUEST_TIMEOUT_SECONDS
+                    )
+                    break
+                except (requests.exceptions.RequestException, httpx.TransportError) as exc:
                     last_error = exc
                     reason = type(exc).__name__
 

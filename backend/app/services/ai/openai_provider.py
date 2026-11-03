@@ -11,6 +11,7 @@ configuration (`OPENAI_MODELS`) precisely so a wrong one is fixable without
 touching code.
 """
 
+import base64
 import logging
 import random
 import time
@@ -26,6 +27,7 @@ from app.services.ai.base import (
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
+    TimetableEntry,
 )
 from app.services.ai.alignment import align_grades
 from app.services.ai.prompts import (
@@ -34,6 +36,7 @@ from app.services.ai.prompts import (
     grading_prompt,
     course_summary_prompt,
     same_concept_prompt,
+    timetable_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,9 +73,15 @@ class _CourseSummary(BaseModel):
     summary: str
 
 
+class _Timetable(BaseModel):
+    entries: list[TimetableEntry]
+
+
 class OpenAIProvider(AIProvider):
     def __init__(self) -> None:
-        self._client = OpenAI(api_key=settings.openai_api_key)
+        # The SDK's own default is a 10-minute timeout with two silent retries,
+        # far beyond Vercel's 5-minute limit; retries are handled below instead.
+        self._client = OpenAI(api_key=settings.openai_api_key, timeout=60.0, max_retries=0)
         self._models = settings.openai_models_list
 
     @property
@@ -122,7 +131,23 @@ class OpenAIProvider(AIProvider):
         by_number = {verdict.pair: verdict.same for verdict in parsed.verdicts}
         return [by_number.get(index, False) for index in range(1, len(pairs) + 1)]
 
-    def _parse(self, prompt: str, schema: type[BaseModel]):
+    def read_timetable(
+        self,
+        data: bytes,
+        mime_type: str,
+        known_courses: list[tuple[str, str]],
+        extra_text: str = "",
+    ) -> list[TimetableEntry]:
+        content: list[dict] = [{"type": "input_text", "text": timetable_prompt(known_courses, extra_text)}]
+        if data:
+            encoded = f"data:{mime_type};base64,{base64.b64encode(data).decode()}"
+            if mime_type.startswith("image/"):
+                content.insert(0, {"type": "input_image", "image_url": encoded})
+            else:
+                content.insert(0, {"type": "input_file", "filename": "timetable.pdf", "file_data": encoded})
+        return self._parse(content, _Timetable).entries
+
+    def _parse(self, prompt: str | list[dict], schema: type[BaseModel]):
         """Structured request with retry, then fall back to the next model."""
         last_error: Exception | None = None
 

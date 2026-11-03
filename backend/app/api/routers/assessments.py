@@ -33,8 +33,7 @@ from app.services.ai.base import ShortAnswerGrade, ShortAnswerSubmission
 from app.services.coaching import record_answers
 from app.services.gamification import record_attempt
 from app.services.grading import is_correct
-from app.workers.generation_worker import process_assessment
-from app.workers.queue import queue
+from app.workers.jobs import PROCESS_ASSESSMENT, enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +103,15 @@ def create_assessment(
         kind=payload.kind,
     )
     db.add(assessment)
+    db.flush()
+    enqueue(
+        db,
+        PROCESS_ASSESSMENT,
+        {"assessment_id": str(assessment.id), "count": payload.count},
+        current_user.id,
+    )
     db.commit()
     db.refresh(assessment)
-
-    queue.enqueue(process_assessment, str(assessment.id), payload.count)
     return assessment
 
 
@@ -288,8 +292,12 @@ def retry_assessment(
     assessment.status = AssessmentStatus.PENDING
     assessment.error_message = None
     assessment.can_retry = False
+    enqueue(
+        db,
+        PROCESS_ASSESSMENT,
+        {"assessment_id": str(assessment.id), "count": count},
+        current_user.id,
+    )
     db.commit()
     db.refresh(assessment)
-
-    queue.enqueue(process_assessment, str(assessment.id), count)
     return assessment

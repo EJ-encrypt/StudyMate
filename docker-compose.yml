@@ -1,3 +1,10 @@
+# Local development only: a Postgres to run the backend and its tests against.
+# Production runs on Vercel + Supabase (see docs/deployment.md).
+#
+#   docker compose up -d
+#
+# then DATABASE_URL=postgresql+psycopg2://studymate:studymate@localhost:5432/studymate
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -14,63 +21,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  backend:
-    build: ./backend
-    image: studymate-app
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql+psycopg2://studymate:studymate@postgres:5432/studymate
-      REDIS_URL: redis://redis:6379/0
-    # Host port 9000: 8000 falls inside a Windows-reserved TCP exclusion range
-    # (netsh interface ipv4 show excludedportrange) and cannot be bound there.
-    ports:
-      - "9000:8000"
-    volumes:
-      - ./backend:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-
-  worker:
-    # Reuses the image backend builds -- same code, different entrypoint.
-    image: studymate-app
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql+psycopg2://studymate:studymate@postgres:5432/studymate
-      REDIS_URL: redis://redis:6379/0
-    volumes:
-      - ./backend:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    # See app/workers/run_worker.py: warms the AI provider before the first
-    # fork, which takes ~45s of SDK import off every document.
-    command: python -m app.workers.run_worker
-
-  frontend:
-    build: ./frontend
-    env_file: .env
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-    command: npm run dev -- --host 0.0.0.0
 
 volumes:
   postgres-data:

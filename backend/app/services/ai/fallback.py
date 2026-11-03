@@ -21,6 +21,7 @@ from app.services.ai.base import (
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
+    TimetableEntry,
 )
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,18 @@ class FallbackProvider(AIProvider):
     def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
         return self._first_that_works(
             "summarise_course", lambda p: p.summarise_course(course_name, concepts)
+        )
+
+    def read_timetable(
+        self,
+        data: bytes,
+        mime_type: str,
+        known_courses: list[tuple[str, str]],
+        extra_text: str = "",
+    ) -> list[TimetableEntry]:
+        return self._first_that_works(
+            "read_timetable",
+            lambda p: p.read_timetable(data, mime_type, known_courses, extra_text),
         )
 
     def embed(self, texts: list[str]) -> list[list[float]]:

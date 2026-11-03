@@ -71,6 +71,10 @@ def sync_document_concepts(db: Session, document_id: uuid.UUID) -> None:
     vectors, embedding_model = provider.embed_tagged(
         [render_for_embedding(c.name, c.summary) for c in pending]
     )
+    # zip() below would otherwise stop at the shorter list and quietly leave
+    # the remaining concepts out of the knowledge base.
+    if len(vectors) != len(pending):
+        raise ValueError(f"Expected {len(pending)} embeddings, got {len(vectors)}")
 
     # Work out the best existing match for each incoming concept first, so the
     # ambiguous ones can be adjudicated together in a single call.

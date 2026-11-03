@@ -31,7 +31,7 @@ export function groupByLevelAndSemester(courses: Course[]): {
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        label: `Level ${course.level} · Semester ${course.semester}`,
+        label: `Level ${course.level} Â· Semester ${course.semester}`,
         courses: [],
       });
     }
