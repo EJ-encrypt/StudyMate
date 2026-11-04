@@ -2,8 +2,10 @@ import {
   Award,
   BellRing,
   Camera,
+  ChevronLeft,
   ChevronRight,
   Compass,
+  FileText,
   KeyRound,
   LogOut,
   LucideIcon,
@@ -24,6 +26,7 @@ import { updatePreferences } from "../api/auth";
 import { errorMessage } from "../api/client";
 import { BlockedStudent, getProgrammes, listBlocked, unblockStudent } from "../api/social";
 import NotificationSettings from "../components/NotificationSettings";
+import TermsOfUse from "../components/TermsOfUse";
 import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { showInstallHelp } from "../lib/installHelp";
@@ -609,6 +612,7 @@ const PAGES: Record<string, SubPage> = {
   reminders: { title: "Lecture reminders", description: "How reminders before and after each lecture reach you.", body: NotificationSettings },
   permissions: { title: "Permissions", description: "What StudyMate may use on this device. Nothing is turned on without asking you.", body: Permissions },
   appearance: { title: "Appearance", description: "Light, dark, or whatever your device uses.", body: Appearance },
+  terms: { title: "Terms of use", description: "The rules for using StudyMate, and what happens to your information.", body: TermsOfUse },
   delete: { title: "Delete account", description: "Remove your account and everything in it.", body: DeleteAccount },
 };
 
@@ -679,8 +683,12 @@ export default function Settings() {
     const Body = page.body;
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-4">
-        <button type="button" onClick={back} className="self-start text-sm font-semibold text-gold-dark hover:underline">
-          ← Settings
+        <button
+          type="button"
+          onClick={back}
+          className="inline-flex items-center gap-1 self-start rounded-full border border-ink/15 bg-surface py-1.5 pl-2 pr-4 text-sm font-semibold text-ink shadow-sm transition hover:border-gold hover:bg-gold/10"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden /> Settings
         </button>
         <div>
           <h1 className="text-xl font-bold text-ink">{page.title}</h1>
@@ -742,6 +750,7 @@ export default function Settings() {
 
       <Group title="Support">
         <Row icon={Compass} label="App tour" onClick={startTour} chevron={false} tour="settings-tour" />
+        <Row icon={FileText} label="Terms of use" onClick={() => open("terms")} />
       </Group>
 
       <Group title="Account">

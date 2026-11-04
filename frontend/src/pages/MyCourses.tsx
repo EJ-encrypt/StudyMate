@@ -1,4 +1,4 @@
-import { ArrowUpCircle, FileUp, Library, Plus } from "lucide-react";
+import { FileUp, Library } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -111,9 +111,9 @@ export default function MyCourses() {
           <button
             type="button"
             onClick={() => showLevel(nextLevel)}
-            className="shrink-0 rounded-full border border-dashed border-ink/25 px-3.5 py-1.5 text-sm font-semibold text-ink/60"
+            className="shrink-0 rounded-full border border-ink/15 bg-surface px-3.5 py-1.5 text-sm font-semibold text-ink shadow-sm"
           >
-            + Level {nextLevel}
+            Start Level {nextLevel}
           </button>
         )}
       </div>
@@ -188,13 +188,21 @@ export default function MyCourses() {
             </h2>
             <div className="flex flex-wrap gap-2">
               {level !== user?.level && (
-                <button type="button" onClick={() => void makeCurrent()} className="btn-ghost text-sm text-gold-dark">
-                  <ArrowUpCircle className="h-4 w-4" aria-hidden /> Make this my current level
+                <button
+                  type="button"
+                  onClick={() => void makeCurrent()}
+                  className="rounded-full border border-ink/15 bg-surface px-3.5 py-1 text-sm font-semibold text-ink shadow-sm transition hover:border-gold hover:bg-gold/10"
+                >
+                  Make this my current level
                 </button>
               )}
               {nextLevel <= HIGHEST_LEVEL && level === Math.max(...shownLevels) && (
-                <button type="button" onClick={() => showLevel(nextLevel)} className="hidden text-sm md:inline-flex btn-ghost">
-                  <Plus className="h-4 w-4" aria-hidden /> Start Level {nextLevel}
+                <button
+                  type="button"
+                  onClick={() => showLevel(nextLevel)}
+                  className="hidden rounded-full border border-ink/15 bg-surface px-3.5 py-1 text-sm font-semibold text-ink shadow-sm transition hover:border-gold hover:bg-gold/10 md:inline-flex"
+                >
+                  Start Level {nextLevel}
                 </button>
               )}
             </div>
