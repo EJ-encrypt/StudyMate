@@ -19,7 +19,9 @@ parts.
 | 6 | Gamification: XP, streaks, badges, Profile | Done |
 | 7 | Testing & evaluation | Instruments prepared; human studies outstanding |
 | + | Hosting on Vercel + Supabase, Supabase Auth | Done |
-| + | Arcade: Beat the Clock, Concept Match | Done |
+| + | Arcade: Beat the Clock, Concept Match, True or False, Odd One Out, Three Strikes | Done |
+| + | Friends, challenges, leaderboards, report and block | Done |
+| + | Spaced-repetition flashcards, Coach revision topics with sources, photo notes | Done |
 | + | Lecture timetable, AI timetable reading, reminders, after-lecture reflection | Done |
 | + | Interface redesign: icons, phone layout, installable app | Done |
 
@@ -80,14 +82,13 @@ compares concepts sharing an embedding model. When a fallback embeds a batch,
 the primary's existing concepts simply are not candidates - which can leave a
 duplicate, the recoverable direction, instead of merging on a nonsense score.
 
-**The OpenAI adapter is unverified against the live API.** No key was
-available. It is written from the published SDK shape and its call was
-confirmed to reach OpenAI's servers - a deliberately invalid key returned a
-structured 401 rather than a client-side type error, so the request is
-well-formed - but neither the model IDs nor the response parsing has been
-exercised for real. Both providers take their model lists from configuration
-(`GEMINI_MODELS`, `OPENAI_MODELS`) so a wrong name is fixable without a code
-change, which is exactly the failure that occurred with Gemini mid-project.
+**The OpenAI adapter was removed.** It was written early from the
+published SDK shape but never exercised against the live API, because
+OpenAI has no free tier. Mistral replaced it as the second provider. Both
+remaining providers take their model lists from configuration
+(`GEMINI_MODELS`, `MISTRAL_MODELS`) so a wrong name is fixable without a
+code change, which is exactly the failure that occurred with Gemini
+mid-project.
 
 **Short-answer grading — LLM-as-judge.** Measured against a fixed question
 and model answer, the judge accepted *"stops you storing the same thing
@@ -127,11 +128,13 @@ instructor review in Phase 7 is run offline against
 instead, which gets the quality assurance the proposal wanted without
 building an unspecified interface.
 
-**Data retention.** Uploaded files are stored on a local volume and are not
-encrypted at rest. This is adequate for a prototype evaluated on synthetic
-and volunteered material, and is **not** adequate for real student data at
-scale. Anyone extending this should treat encryption at rest and a
-retention policy as prerequisites, not enhancements.
+**Data retention.** Uploaded files live in a private Supabase Storage
+bucket, reachable only through short-lived signed URLs issued by the API;
+Supabase encrypts its storage at rest. Deleting a course removes its files,
+questions and scores, and deleting an account removes everything the
+student added. There is no fixed retention period: material stays until
+the student deletes it. A deployment holding real student data at scale
+would need a written retention policy and a data-protection review first.
 
 ## Moving to serverless hosting (November 2026)
 
@@ -309,12 +312,13 @@ failures and record them as infrastructure events, not usability defects.
 
 ## Verification performed
 
-- 232 automated backend tests, run against live PostgreSQL, including the
+- 268 automated backend tests, run against live PostgreSQL, including the
   job queue, Supabase token verification, the upload flow, games,
   timetable reading, reminder timing and idempotency, and the Mistral
   adapter against recorded API responses.
-- Frontend type-checks and builds clean; 10 component tests, including the
-  navigation and the Concept Match game.
+- Frontend type-checks and builds clean; 50 component and unit tests,
+  including the navigation, the guided tour, the Concept Match game, adding
+  courses, the offline notice and the Coach revision topics.
 - The full student journey, run through the Vercel entry point against a
   fresh database migrated from scratch, with real Gemini calls: sign-up,
   upload, concept extraction, knowledge base, MCQ generation, both games,
@@ -324,9 +328,10 @@ failures and record them as infrastructure events, not usability defects.
   LLM marking, cumulative de-duplication across two overlapping lectures,
   mastery movement in both directions, and badge awarding.
 
-**Not verified: the interface itself.** Every check above is at API, worker,
-database or build level. No automated browser driving was available in the
-development environment, so no test confirms that the pages behave
-correctly when clicked. The usability sessions in Phase 7 are the first
-real exercise of the UI, which is a genuine gap — a component test suite
-for the React pages would be the highest-value addition to this work.
+**Not verified automatically: the interface end to end.** The component
+tests render pages and click through them in a simulated browser, but no
+test drives the real site in a real browser across a whole journey. The
+interface has been exercised by hand on a laptop and an iPhone throughout
+development; the usability sessions in Phase 7 are its first structured
+test with other students. Browser-driven end-to-end tests would be the
+highest-value addition to this work.
