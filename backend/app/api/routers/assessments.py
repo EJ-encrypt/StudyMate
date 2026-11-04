@@ -231,27 +231,30 @@ def submit_attempt(
                 item_id=item.id,
                 response=submission.response,
                 is_correct=correct,
+                marked=item.kind is not ItemKind.SHORT_ANSWER or grade is not None,
                 correct_answer=item.answer,
                 explanation=feedback,
             )
         )
 
+    marked = [answer for answer in graded if answer.marked]
+
     record_answers(
         db,
         current_user.id,
         assessment.course_id,
-        [(items[answer.item_id], answer.is_correct) for answer in graded],
+        [(items[answer.item_id], answer.is_correct) for answer in marked],
     )
 
     attempt = Attempt(
         assessment_id=assessment.id,
         student_id=current_user.id,
-        correct_count=sum(1 for answer in graded if answer.is_correct),
-        total_count=len(graded),
+        correct_count=sum(1 for answer in marked if answer.is_correct),
+        total_count=len(marked),
     )
     db.add(attempt)
     db.flush()
-    for answer in graded:
+    for answer in marked:
         db.add(
             AttemptAnswer(
                 attempt_id=attempt.id,
@@ -260,9 +263,8 @@ def submit_attempt(
                 is_correct=answer.is_correct,
             )
         )
-    new_badges = record_attempt(
-        db, current_user.id, assessment, attempt.correct_count, attempt.total_count
-    )
+    # Out of every answer, so a paper with unmarked answers cannot count as full marks.
+    new_badges = record_attempt(db, current_user.id, assessment, attempt.correct_count, len(graded))
     db.commit()
     db.refresh(attempt)
 

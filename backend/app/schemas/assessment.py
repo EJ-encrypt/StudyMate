@@ -73,6 +73,9 @@ class GradedAnswer(BaseModel):
     item_id: uuid.UUID
     response: str
     is_correct: bool
+    # False when the AI could not mark a written answer. An unmarked answer is
+    # left out of the score and of mastery, because it is not evidence either way.
+    marked: bool = True
     correct_answer: str
     explanation: str
 

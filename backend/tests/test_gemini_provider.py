@@ -278,9 +278,8 @@ def test_reports_unmarked_when_counts_do_not_line_up(provider: GeminiProvider) -
 
     grades = provider.grade_short_answers(_submissions())
 
-    assert [g.reference for g in grades] == GRADE_REFS
-    assert all(not g.is_correct for g in grades)
-    assert all("unavailable" in g.feedback.lower() for g in grades)
+    # Nothing is returned for them, so the caller treats them as unmarked, not wrong.
+    assert grades == []
 
 
 def test_no_submissions_makes_no_call(provider: GeminiProvider) -> None:

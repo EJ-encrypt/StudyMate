@@ -36,6 +36,8 @@ export interface GradedAnswer {
   item_id: string;
   response: string;
   is_correct: boolean;
+  /** False when the AI could not mark a written answer; it is left out of the score. */
+  marked: boolean;
   correct_answer: string;
   explanation: string;
 }

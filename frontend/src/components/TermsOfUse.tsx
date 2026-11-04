@@ -45,8 +45,8 @@ const SECTIONS: Section[] = [
   {
     title: "Your material",
     body: [
-      "Files, notes and photos you upload stay yours, and only you can see them. Upload only material you are allowed to use for study, such as your own notes and slides shared with your class, and don't upload other people's personal details.",
-      "You allow StudyMate to store your material and to send it to the AI services it uses (Google Gemini and Mistral) to read it and write questions from it. When you challenge a friend, they play the questions from that round, not your files.",
+      "Files, notes and photos you upload stay yours, and other StudyMate users cannot see them. Upload only material you are allowed to use for study, such as your own notes and slides shared with your class, and don't upload other people's personal details.",
+      "You allow StudyMate to store your material and to send it to the AI services it uses (Google Gemini and Mistral) to read it and write questions from it. StudyMate uses these services' free plans, under which a provider may use what it receives to improve its products, and its staff may read it. Don't upload anything sensitive or confidential. When you challenge a friend, they play the questions from that round, not your files.",
     ],
   },
   {

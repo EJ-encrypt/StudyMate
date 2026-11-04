@@ -26,7 +26,7 @@ def align_grades(
     Models decorate the reference (brackets, quotes, stray whitespace), so
     matching is done on a cleaned form. If a reference still cannot be matched
     but the counts line up, order is trusted instead. Anything left over is
-    reported unmarked rather than risking a grade being attributed to the wrong
+    left out, so it stays unmarked, rather than risking a grade being attributed to the wrong
     question.
     """
     by_reference = {clean_reference(grade.reference): grade for grade in returned}
@@ -43,17 +43,8 @@ def align_grades(
             )
 
         if grade is None:
-            logger.warning("No grade returned for %s; marking as needing review", submission.reference)
-            results.append(
-                ShortAnswerGrade(
-                    reference=submission.reference,
-                    is_correct=False,
-                    feedback=(
-                        "Automatic marking is unavailable for this answer. "
-                        "Compare it with the model answer."
-                    ),
-                )
-            )
+            # Left out, so the caller treats it as unmarked rather than wrong.
+            logger.warning("No grade returned for %s; leaving it unmarked", submission.reference)
         else:
             # Return our own reference so callers can always match on it.
             results.append(

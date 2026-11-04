@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Gamepad2, Send, Trophy, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Gamepad2, Send, Trophy, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -60,6 +60,7 @@ export default function Quiz() {
   const answered = assessment.items.filter((item) => (responses[item.id] ?? "").trim()).length;
   const playable = assessment.kind === "mcq" || assessment.kind === "fill_blank";
   const percent = result && result.total_count ? Math.round((result.correct_count / result.total_count) * 100) : 0;
+  const unmarked = result ? result.answers.filter((a) => !a.marked).length : 0;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -80,9 +81,14 @@ export default function Quiz() {
             </span>
             <div>
               <p className="text-2xl font-bold">
-                {result.correct_count} / {result.total_count}
+                {result.total_count ? `${result.correct_count} / ${result.total_count}` : "Not marked"}
               </p>
-              <p className="text-sm text-white/70">{percent}% correct</p>
+              {result.total_count > 0 && <p className="text-sm text-white/70">{percent}% correct</p>}
+              {unmarked > 0 && (
+                <p className="text-sm text-white/70">
+                  {unmarked} written answer{unmarked === 1 ? "" : "s"} could not be marked and {unmarked === 1 ? "is" : "are"} not counted.
+                </p>
+              )}
             </div>
           </div>
           <div className="space-y-3 p-4">
@@ -107,7 +113,7 @@ export default function Quiz() {
                 key={item.id}
                 className={[
                   "card p-4",
-                  answer ? (answer.is_correct ? "border-green-300" : "border-red-300") : "",
+                  !answer ? "" : !answer.marked ? "border-amber-300" : answer.is_correct ? "border-green-300" : "border-red-300",
                 ].join(" ")}
               >
                 <legend className="sr-only">Question {index + 1}</legend>
@@ -180,15 +186,17 @@ export default function Quiz() {
                     <p
                       className={[
                         "flex items-center gap-1.5 font-semibold",
-                        answer.is_correct ? "text-green-700" : "text-red-600",
+                        !answer.marked ? "text-amber-700" : answer.is_correct ? "text-green-700" : "text-red-600",
                       ].join(" ")}
                     >
-                      {answer.is_correct ? (
+                      {!answer.marked ? (
+                        <AlertCircle className="h-4 w-4" aria-hidden />
+                      ) : answer.is_correct ? (
                         <CheckCircle2 className="h-4 w-4" aria-hidden />
                       ) : (
                         <XCircle className="h-4 w-4" aria-hidden />
                       )}
-                      {answer.is_correct ? "Correct" : "Incorrect"}
+                      {!answer.marked ? "Not marked" : answer.is_correct ? "Correct" : "Incorrect"}
                     </p>
                     {!answer.is_correct && (
                       <p className="mt-1 text-ink">

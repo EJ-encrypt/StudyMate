@@ -321,7 +321,10 @@ def test_attempt_survives_judge_failure(client: TestClient, db: Session) -> None
     provider = MagicMock()
     provider.grade_short_answers.side_effect = RuntimeError("model unavailable")
 
-    with patch("app.api.routers.assessments.get_ai_provider", return_value=provider):
+    with (
+        patch("app.api.routers.assessments.get_ai_provider", return_value=provider),
+        patch("app.api.routers.assessments.record_answers") as record,
+    ):
         response = client.post(
             f"/assessments/{assessment.id}/attempts",
             headers=headers,
@@ -334,6 +337,10 @@ def test_attempt_survives_judge_failure(client: TestClient, db: Session) -> None
     # The student is told marking did not run, rather than silently scored zero.
     assert "unavailable" in body["answers"][0]["explanation"].lower()
     assert body["answers"][0]["correct_answer"] == "It removes redundancy so each fact is stored once."
+    # An answer nobody marked is not evidence: not in the score, and mastery does not move.
+    assert body["answers"][0]["marked"] is False
+    assert body["total_count"] == 0
+    assert record.call_args.args[3] == []
 
 
 def test_deterministic_quiz_never_calls_the_model(client: TestClient, db: Session) -> None:
