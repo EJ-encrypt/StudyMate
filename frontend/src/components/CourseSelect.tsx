@@ -40,7 +40,7 @@ export default function CourseSelect({ selectedCourseId, onSelect, allowCreate =
     <div className="flex flex-wrap items-center gap-2">
       <label className="relative flex min-w-0 flex-1 items-center sm:max-w-sm">
         <span className="sr-only">Course</span>
-        <BookOpen className="pointer-events-none absolute left-3 h-4 w-4 text-navy/40" aria-hidden />
+        <BookOpen className="pointer-events-none absolute left-3 h-4 w-4 text-ink/40" aria-hidden />
         <select
           value={selectedCourseId ?? ""}
           onChange={(e) => onSelect(e.target.value)}

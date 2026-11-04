@@ -2,12 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme colours, as "R G B" so Tailwind can add opacity (text-ink/60).
+   src/lib/theme.ts adds the "dark" class to <html>. */
+:root {
+  color-scheme: light;
+  --canvas: 248 250 252;
+  --surface: 255 255 255;
+  --ink: 10 31 68;
+  --navy: 10 31 68;
+  --navy-light: 18 48 95;
+  --gold-dark: 169 134 43;
+  --shadow: 10 31 68;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --canvas: 7 15 31;
+  --surface: 15 29 56;
+  --ink: 226 232 242;
+  --navy: 22 45 88;
+  --navy-light: 32 62 118;
+  /* The light theme's dark gold is too dim against a dark page. */
+  --gold-dark: 228 199 103;
+  --shadow: 0 0 0;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply bg-slate-50 font-sans text-navy antialiased;
+    @apply bg-canvas font-sans text-ink antialiased;
   }
 }
 
@@ -19,29 +44,90 @@
     @apply btn bg-navy text-gold shadow-sm hover:bg-navy-light;
   }
   .btn-gold {
-    @apply btn bg-gold text-navy shadow-sm hover:bg-gold-light;
+    @apply btn bg-gold text-navy-dark shadow-sm hover:bg-gold-light;
   }
   .btn-secondary {
-    @apply btn border border-navy/15 bg-white text-navy hover:border-navy/30 hover:bg-navy/5;
+    @apply btn border border-ink/15 bg-surface text-ink hover:border-ink/30 hover:bg-ink/5;
   }
   .btn-ghost {
-    @apply btn px-2 text-navy/70 hover:bg-navy/5 hover:text-navy;
+    @apply btn px-2 text-ink/70 hover:bg-ink/5 hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white shadow-sm hover:bg-red-700;
   }
   .card {
-    @apply rounded-xl border border-navy/10 bg-white shadow-card;
+    @apply rounded-xl border border-ink/10 bg-surface shadow-card;
   }
   .input {
-    @apply w-full rounded-lg border border-navy/20 bg-white px-3 py-2 text-sm text-navy placeholder:text-navy/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/30;
+    @apply w-full rounded-lg border border-ink/20 bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/30;
   }
   .label {
-    @apply block text-xs font-semibold uppercase tracking-wide text-navy/60;
+    @apply block text-xs font-semibold uppercase tracking-wide text-ink/60;
   }
   .section-title {
-    @apply mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-navy/50;
+    @apply mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ink/50;
   }
 }
+
+/* The pale status tints (green for correct, red for wrong) are written as
+   ordinary Tailwind colours. On a dark page they would glare and their text
+   would vanish, so dark mode swaps them for deep tints with light text. */
+.dark .bg-green-50,
+.dark .bg-green-100 { background-color: rgb(22 101 52 / 0.28); }
+.dark .bg-red-50,
+.dark .bg-red-100 { background-color: rgb(153 27 27 / 0.3); }
+.dark .bg-sky-100 { background-color: rgb(7 89 133 / 0.35); }
+.dark .text-green-700,
+.dark .text-green-800,
+.dark .text-green-900 { color: rgb(134 239 172); }
+.dark .text-red-600,
+.dark .text-red-700 { color: rgb(252 165 165); }
+.dark .text-sky-800 { color: rgb(125 211 252); }
+.dark .border-green-200,
+.dark .border-green-300,
+.dark .border-green-400 { border-color: rgb(34 197 94 / 0.6); }
+.dark .border-red-200,
+.dark .border-red-300,
+.dark .border-red-400 { border-color: rgb(248 113 113 / 0.6); }
 
 /* Leaves room for the phone's home indicator under the bottom tab bar. */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Flashcards: a real card turn. Both faces share one grid cell, so the card
+   is as tall as its longer side and nothing jumps when it turns over. */
+.flip-scene {
+  perspective: 1200px;
+}
+.flip-card {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.flip-card.is-flipped {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .flip-card {
+    transition: none;
+  }
+}
+
+/* KaTeX: equations follow the text colour and never push a phone screen sideways. */
+.katex {
+  font-size: 1.05em;
+}
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
 }

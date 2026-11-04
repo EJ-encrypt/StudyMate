@@ -45,13 +45,13 @@ export default function Register() {
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
             <MailCheck className="h-6 w-6" aria-hidden />
           </span>
-          <p className="text-sm text-navy/75">
-            We sent a confirmation link to <span className="font-semibold text-navy">{email}</span>.
+          <p className="text-sm text-ink/75">
+            We sent a confirmation link to <span className="font-semibold text-ink">{email}</span>.
             Open it on this device to finish creating your account.
           </p>
-          <p className="mt-3 text-xs text-navy/50">Nothing after a few minutes? Check your spam folder.</p>
+          <p className="mt-3 text-xs text-ink/50">Nothing after a few minutes? Check your spam folder.</p>
         </div>
-        <p className="mt-6 text-sm text-navy/70">
+        <p className="mt-6 text-sm text-ink/70">
           Already confirmed?{" "}
           <Link to="/login" className="font-semibold text-gold-dark hover:underline">
             Log in
@@ -97,7 +97,7 @@ export default function Register() {
             minLength={8}
             className="input mt-1"
           />
-          <span className="mt-1 block text-xs text-navy/50">At least 8 characters.</span>
+          <span className="mt-1 block text-xs text-ink/50">At least 8 characters.</span>
         </label>
         {error && <Alert>{error}</Alert>}
         <button type="submit" disabled={isSubmitting} className="btn-primary mt-1 py-2.5">
@@ -105,7 +105,7 @@ export default function Register() {
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
       </form>
-      <p className="mt-6 text-sm text-navy/70">
+      <p className="mt-6 text-sm text-ink/70">
         Already have an account?{" "}
         <Link to="/login" className="font-semibold text-gold-dark hover:underline">
           Log in

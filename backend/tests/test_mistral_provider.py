@@ -32,7 +32,7 @@ def test_strict_schema_inlines_nested_models_and_closes_objects() -> None:
     assert "$defs" not in json.dumps(schema)
     item = schema["properties"]["items"]["items"]
     assert item["additionalProperties"] is False
-    assert set(item["required"]) == {"kind", "question", "answer", "options", "explanation", "concept"}
+    assert set(item["required"]) == {"kind", "question", "working", "answer", "options", "explanation", "concept"}
     assert "mcq" in item["properties"]["kind"]["enum"]
 
 
@@ -104,7 +104,7 @@ def test_a_bad_request_is_not_retried() -> None:
 
 
 def test_generated_items_of_the_wrong_kind_are_dropped() -> None:
-    item = {"question": "Q", "answer": "A", "options": [], "explanation": "", "concept": ""}
+    item = {"question": "Q", "working": "", "answer": "A", "options": [], "explanation": "", "concept": ""}
 
     def handler(request):
         return _chat({"items": [{**item, "kind": "mcq"}, {**item, "kind": "flashcard"}]})

@@ -1,6 +1,5 @@
 import {
   Award,
-  BellRing,
   BookOpenCheck,
   Flame,
   Gamepad2,
@@ -10,6 +9,7 @@ import {
   Medal,
   NotebookPen,
   Rocket,
+  Settings,
   Star,
   Target,
   Timer,
@@ -19,9 +19,9 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { getProgress, ProgressSummary } from "../api/profile";
-import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
 import { Alert, Spinner, StatTile } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -79,7 +79,7 @@ export default function Profile() {
             <StatTile icon={BookOpenCheck} label="Quizzes taken" value={progress.attempts} />
           </section>
 
-          <p className="mt-3 text-sm text-navy/60">
+          <p className="mt-3 text-sm text-ink/60">
             {progress.documents} document{progress.documents === 1 ? "" : "s"} uploaded
             {progress.last_active_on && ` · last studied ${progress.last_active_on}`}
           </p>
@@ -97,19 +97,19 @@ export default function Profile() {
                     key={badge.code}
                     className={[
                       "flex flex-col items-center rounded-xl border p-3 text-center",
-                      unlocked ? "border-gold bg-gradient-to-b from-gold/15 to-white shadow-card" : "border-navy/10 bg-white/60",
+                      unlocked ? "border-gold bg-gradient-to-b from-gold/15 to-surface shadow-card" : "border-ink/10 bg-surface/60",
                     ].join(" ")}
                   >
                     <span
                       className={[
                         "flex h-11 w-11 items-center justify-center rounded-full",
-                        unlocked ? "bg-navy text-gold" : "bg-navy/5 text-navy/30",
+                        unlocked ? "bg-navy text-gold" : "bg-ink/5 text-ink/30",
                       ].join(" ")}
                     >
                       {unlocked ? <Icon className="h-5 w-5" aria-hidden /> : <Lock className="h-4 w-4" aria-hidden />}
                     </span>
-                    <p className={`mt-2 text-sm font-semibold ${unlocked ? "text-navy" : "text-navy/50"}`}>{badge.name}</p>
-                    <p className="mt-0.5 text-xs text-navy/55">{badge.description}</p>
+                    <p className={`mt-2 text-sm font-semibold ${unlocked ? "text-ink" : "text-ink/50"}`}>{badge.name}</p>
+                    <p className="mt-0.5 text-xs text-ink/55">{badge.description}</p>
                   </li>
                 );
               })}
@@ -119,22 +119,24 @@ export default function Profile() {
       )}
 
       <section className="mt-8">
-        <h2 className="section-title">
-          <BellRing className="h-3.5 w-3.5" aria-hidden /> Lecture reminders
-        </h2>
-        <NotificationSettings />
-      </section>
-
-      <section className="mt-8">
         <h2 className="section-title">Account</h2>
         <dl className="card grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 p-4 text-sm">
-          <dt className="text-navy/55">Email</dt>
-          <dd className="truncate text-navy">{user?.email}</dd>
-          <dt className="text-navy/55">School</dt>
-          <dd className="text-navy">{user?.school ?? "—"}</dd>
-          <dt className="text-navy/55">Time zone</dt>
-          <dd className="text-navy">{user?.timezone}</dd>
+          {user?.username && (
+            <>
+              <dt className="text-ink/55">Username</dt>
+              <dd className="truncate text-ink">@{user.username}</dd>
+            </>
+          )}
+          <dt className="text-ink/55">Email</dt>
+          <dd className="truncate text-ink">{user?.email}</dd>
+          <dt className="text-ink/55">School</dt>
+          <dd className="text-ink">{user?.school ?? "—"}</dd>
+          <dt className="text-ink/55">Time zone</dt>
+          <dd className="text-ink">{user?.timezone}</dd>
         </dl>
+        <Link to="/settings" className="btn-secondary mt-3">
+          <Settings className="h-4 w-4" aria-hidden /> Settings and reminders
+        </Link>
       </section>
     </>
   );

@@ -61,8 +61,8 @@ export default function Reflect() {
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
             <CheckCircle2 className="h-6 w-6" aria-hidden />
           </span>
-          <p className="font-semibold text-navy">Saved to your course notes</p>
-          <p className="mt-1 text-sm text-navy/60">
+          <p className="font-semibold text-ink">Saved to your course notes</p>
+          <p className="mt-1 text-sm text-ink/60">
             StudyMate is reading it now, so its ideas join your knowledge base, quizzes and games.
           </p>
           <div className="mt-4 w-full">
@@ -110,10 +110,10 @@ export default function Reflect() {
 
         <form onSubmit={handleSubmit} className="space-y-4 p-4">
           <div>
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-navy">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
               <NotebookPen className="h-4 w-4 text-gold-dark" aria-hidden /> What did you learn?
             </p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-navy/55">
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-ink/55">
               {PROMPTS.map((prompt) => (
                 <li key={prompt}>{prompt}</li>
               ))}
@@ -140,7 +140,7 @@ export default function Reflect() {
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-xs text-navy/50">Remembered for next week&apos;s lecture.</span>
+              <span className="mt-1 block text-xs text-ink/50">Remembered for next week&apos;s lecture.</span>
             </label>
           )}
 

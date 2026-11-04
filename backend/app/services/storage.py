@@ -87,6 +87,19 @@ class SupabaseStorage:
             raise StorageError(f"Download failed ({response.status_code}): {response.text}")
         return response.content
 
+    def delete(self, paths: list[str]) -> None:
+        # The API takes up to a thousand objects per call.
+        for start in range(0, len(paths), 1000):
+            response = httpx.request(
+                "DELETE",
+                f"{self._base}/object/{self._bucket}",
+                headers=self._headers,
+                json={"prefixes": paths[start : start + 1000]},
+                timeout=60,
+            )
+            if response.status_code >= 400:
+                raise StorageError(f"Delete failed ({response.status_code}): {response.text}")
+
 
 def _sign(path: str) -> str:
     key = (settings.cron_secret or settings.supabase_jwt_secret or "local-dev").encode()
@@ -135,6 +148,12 @@ class LocalStorage:
         if not target.is_file():
             raise FileMissing(path)
         return target.read_bytes()
+
+    def delete(self, paths: list[str]) -> None:
+        for path in paths:
+            target = self._resolve(path)
+            if target.is_file():
+                target.unlink()
 
 
 @lru_cache

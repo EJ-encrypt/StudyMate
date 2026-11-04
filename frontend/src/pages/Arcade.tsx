@@ -1,4 +1,4 @@
-import { Gamepad2, Grid3x3, Lock, Play, Sparkles, Timer, Trophy } from "lucide-react";
+import { Gamepad2, Link2, Lock, Play, Sparkles, Timer, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -31,9 +31,13 @@ const GAMES: GameInfo[] = [
     game: "concept_match",
     path: "match",
     title: "Concept Match",
-    tagline: "Flip the cards and pair each concept with its meaning.",
-    rules: ["Match all pairs as fast as you can", "Wrong pairs cost points", "Built from your course knowledge base"],
-    icon: Grid3x3,
+    tagline: "Concepts on one side, meanings on the other. Pair them all up.",
+    rules: [
+      "Tap a concept, then its meaning: green if right, red if not",
+      "Up to eight pairs a round; wrong pairs cost points",
+      "Built from your course knowledge base",
+    ],
+    icon: Link2,
     accent: "from-gold-dark to-gold",
   },
 ];
@@ -97,7 +101,7 @@ export default function Arcade() {
                   <p className="text-sm text-white/80">{info.tagline}</p>
                 </div>
                 <div className="flex flex-1 flex-col p-4">
-                  <ul className="space-y-1 text-sm text-navy/70">
+                  <ul className="space-y-1 text-sm text-ink/70">
                     {info.rules.map((rule) => (
                       <li key={rule} className="flex items-start gap-2">
                         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" aria-hidden />
@@ -105,16 +109,16 @@ export default function Arcade() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-4 flex items-center gap-4 text-xs text-navy/55">
+                  <div className="mt-4 flex items-center gap-4 text-xs text-ink/55">
                     <span className="flex items-center gap-1">
                       <Trophy className="h-3.5 w-3.5 text-gold-dark" aria-hidden />
-                      Best: <span className="font-semibold text-navy">{record?.best?.toLocaleString() ?? "—"}</span>
+                      Best: <span className="font-semibold text-ink">{record?.best?.toLocaleString() ?? "—"}</span>
                     </span>
                     <span>
-                      Played <span className="font-semibold text-navy">{record?.plays ?? 0}</span>×
+                      Played <span className="font-semibold text-ink">{record?.plays ?? 0}</span>×
                     </span>
                   </div>
-                  <p className={`mt-3 text-xs ${ready ? "text-navy/45" : "text-red-600"}`}>{reason}</p>
+                  <p className={`mt-3 text-xs ${ready ? "text-ink/45" : "text-red-600"}`}>{reason}</p>
                   <div className="mt-auto pt-4">
                     {ready ? (
                       <Link to={`/play/${courseId}/${info.path}`} className="btn-primary w-full py-2.5">

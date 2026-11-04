@@ -28,12 +28,11 @@ function renderGame() {
   );
 }
 
-const hidden = () => screen.queryAllByRole("button", { name: "Hidden card" });
+const concept = (name: string) => screen.getByRole("button", { name: new RegExp(`^Concept: ${name}`) });
+const meaning = (start: string) => screen.getByRole("button", { name: new RegExp(`^Meaning: ${start}`) });
 
 describe("Concept Match", () => {
   beforeEach(() => {
-    // With random() just under 1 the shuffle swaps nothing, so cards are dealt
-    // in order: Deadlock, its clue, Paging, its clue.
     vi.spyOn(Math, "random").mockReturnValue(0.9999);
     submitConceptMatch.mockReset();
     submitConceptMatch.mockResolvedValue({
@@ -51,48 +50,53 @@ describe("Concept Match", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("deals two face-down cards per concept", async () => {
+  it("lays concepts and meanings out in two columns", async () => {
     renderGame();
-    await waitFor(() => expect(hidden()).toHaveLength(4));
+    await screen.findByRole("region", { name: "Concepts" });
+    expect(screen.getAllByRole("button", { name: /^Concept:/ })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /^Meaning:/ })).toHaveLength(2);
   });
 
-  it("keeps a matched pair face up", async () => {
+  it("highlights a picked card, and locks a correct pair in green", async () => {
     renderGame();
-    await waitFor(() => expect(hidden()).toHaveLength(4));
-    const [deadlock, deadlockClue] = hidden();
+    await screen.findByRole("region", { name: "Concepts" });
 
-    fireEvent.click(deadlock);
-    fireEvent.click(deadlockClue);
+    fireEvent.click(concept("Deadlock"));
+    expect(concept("Deadlock")).toHaveAttribute("aria-pressed", "true");
 
-    expect(hidden()).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Deadlock" })).toBeDisabled();
+    fireEvent.click(meaning("Processes"));
+    expect(concept("Deadlock")).toBeDisabled();
+    expect(meaning("Processes")).toBeDisabled();
+    expect(concept("Deadlock").className).toContain("green");
   });
 
-  it("turns a wrong pair back over and counts it as a mistake", async () => {
+  it("shows a wrong pair in red, then resets it and counts a mistake", async () => {
     renderGame();
-    await waitFor(() => expect(hidden()).toHaveLength(4));
-    const [deadlock, , paging] = hidden();
+    await screen.findByRole("region", { name: "Concepts" });
 
-    fireEvent.click(deadlock);
-    fireEvent.click(paging);
-    expect(hidden()).toHaveLength(2);
+    fireEvent.click(concept("Deadlock"));
+    fireEvent.click(meaning("Memory"));
+    expect(concept("Deadlock").className).toContain("red");
+    expect(meaning("Memory").className).toContain("red");
 
-    await waitFor(() => expect(hidden()).toHaveLength(4), { timeout: 2000 });
+    await waitFor(() => expect(concept("Deadlock").className).not.toContain("red"), { timeout: 2000 });
+    expect(concept("Deadlock")).not.toBeDisabled();
+    expect(concept("Deadlock")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("submits the round, with its mistakes, once every pair is found", async () => {
     renderGame();
-    await waitFor(() => expect(hidden()).toHaveLength(4));
-    const cards = hidden();
+    await screen.findByRole("region", { name: "Concepts" });
 
-    fireEvent.click(cards[0]);
-    fireEvent.click(cards[2]); // wrong
-    await waitFor(() => expect(hidden()).toHaveLength(4), { timeout: 2000 });
+    fireEvent.click(concept("Deadlock"));
+    fireEvent.click(meaning("Memory")); // wrong
+    await waitFor(() => expect(concept("Deadlock").className).not.toContain("red"), { timeout: 2000 });
 
-    fireEvent.click(cards[0]);
-    fireEvent.click(cards[1]);
-    fireEvent.click(cards[2]);
-    fireEvent.click(cards[3]);
+    // Either side can go first.
+    fireEvent.click(meaning("Processes"));
+    fireEvent.click(concept("Deadlock"));
+    fireEvent.click(concept("Paging"));
+    fireEvent.click(meaning("Memory"));
 
     await waitFor(() => expect(submitConceptMatch).toHaveBeenCalledTimes(1));
     const [courseId, conceptIds, mistakes] = submitConceptMatch.mock.calls[0];

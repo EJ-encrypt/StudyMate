@@ -19,16 +19,16 @@ export default function CourseCard({
   const body = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy/5 text-navy group-hover:bg-gold/20">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink group-hover:bg-gold/20">
           <BookOpen className="h-[18px] w-[18px]" aria-hidden />
         </span>
         {!disabled && (
-          <ChevronRight className="h-4 w-4 text-navy/30 transition group-hover:translate-x-0.5 group-hover:text-gold-dark" aria-hidden />
+          <ChevronRight className="h-4 w-4 text-ink/30 transition group-hover:translate-x-0.5 group-hover:text-gold-dark" aria-hidden />
         )}
       </div>
-      <p className="mt-3 text-sm font-bold text-navy">{course.code}</p>
-      <p className="line-clamp-2 text-sm text-navy/70">{course.name}</p>
-      <p className="mt-2 flex items-center gap-1 text-xs text-navy/50">
+      <p className="mt-3 text-sm font-bold text-ink">{course.code}</p>
+      <p className="line-clamp-2 text-sm text-ink/70">{course.name}</p>
+      <p className="mt-2 flex items-center gap-1 text-xs text-ink/50">
         {footer ?? (
           <>
             <FileText className="h-3.5 w-3.5" aria-hidden />

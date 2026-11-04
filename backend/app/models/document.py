@@ -39,6 +39,10 @@ class LectureDocument(Base):
     # Whether the failure was transient, so the UI can offer a retry rather
     # than leaving the student stuck on a dead end.
     can_retry: Mapped[bool] = mapped_column(default=False, nullable=False)
+    # The text read out of the file. Kept so question generation does not
+    # download and read it again, and so an AI transcription of maths material
+    # (with its LaTeX) is paid for once rather than for every quiz.
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     concepts: Mapped[list["KnowledgeConcept"]] = relationship(back_populates="document")

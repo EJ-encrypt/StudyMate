@@ -1,8 +1,9 @@
-import { Library, Plus, X } from "lucide-react";
+import { FileUp, Library, Plus, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { Course, createCourse, groupByLevelAndSemester, listCourses } from "../api/courses";
 import CourseCard from "../components/CourseCard";
+import CourseImport from "../components/CourseImport";
 import PageHeader from "../components/PageHeader";
 import { Alert, EmptyState, Spinner } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +14,8 @@ export default function MyCourses() {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [level, setLevel] = useState(user?.level ?? 100);
@@ -51,10 +54,29 @@ export default function MyCourses() {
         title="My Courses"
         subtitle={user?.school ?? "Everything you are studying, by level and semester."}
         actions={
-          <button type="button" onClick={() => setIsAdding((prev) => !prev)} className="btn-primary">
-            {isAdding ? <X className="h-4 w-4" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            {isAdding ? "Cancel" : "Add course"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setIsImporting((prev) => !prev);
+                setIsAdding(false);
+              }}
+              className="btn-secondary"
+            >
+              <FileUp className="h-4 w-4" aria-hidden /> Import from file
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdding((prev) => !prev);
+                setIsImporting(false);
+              }}
+              className="btn-primary"
+            >
+              {isAdding ? <X className="h-4 w-4" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+              {isAdding ? "Cancel" : "Add course"}
+            </button>
+          </>
         }
       />
 
@@ -97,6 +119,23 @@ export default function MyCourses() {
         </form>
       )}
 
+      {isImporting && (
+        <CourseImport
+          onCancel={() => setIsImporting(false)}
+          onDone={async (added) => {
+            setIsImporting(false);
+            setNotice(added ? `Added ${added} course${added === 1 ? "" : "s"}.` : "Those courses were already in your list.");
+            setCourses(await listCourses());
+          }}
+        />
+      )}
+
+      {notice && (
+        <div className="mb-4">
+          <Alert kind="success">{notice}</Alert>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4">
           <Alert>{error}</Alert>
@@ -105,17 +144,23 @@ export default function MyCourses() {
 
       {courses === null && <Spinner />}
 
-      {courses?.length === 0 && !isAdding && (
+      {courses?.length === 0 && !isAdding && !isImporting && (
         <EmptyState
           icon={Library}
           title="No courses yet"
           action={
-            <button type="button" onClick={() => setIsAdding(true)} className="btn-primary">
-              <Plus className="h-4 w-4" aria-hidden /> Add your first course
-            </button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button type="button" onClick={() => setIsAdding(true)} className="btn-primary">
+                <Plus className="h-4 w-4" aria-hidden /> Add your first course
+              </button>
+              <button type="button" onClick={() => setIsImporting(true)} className="btn-secondary">
+                <FileUp className="h-4 w-4" aria-hidden /> Import from a photo or PDF
+              </button>
+            </div>
           }
         >
-          Add a course, then upload its slides, PDFs or notes to start revising.
+          Add your courses by hand, or import them from your registration slip or course list. Then upload slides,
+          PDFs or notes to start revising.
         </EmptyState>
       )}
 

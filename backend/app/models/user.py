@@ -23,6 +23,8 @@ class User(Base):
     # created before the move are not lost by a destructive migration.
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Optional handle chosen in Settings. Stored lowercase; unique.
+    username: Mapped[str | None] = mapped_column(String(30), unique=True, nullable=True)
     # values_callable keeps the lowercase member *values* in Postgres; without it
     # SQLAlchemy would persist member names ("STUDENT") and break the enum type.
     role: Mapped[UserRole] = mapped_column(
@@ -44,6 +46,10 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Africa/Accra")
     notify_push: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_email: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Whether the first-run walkthrough has been finished or skipped. Kept on
+    # the account rather than in the browser, so dismissing it on a laptop
+    # also dismisses it on a phone.
+    tutorial_seen: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")

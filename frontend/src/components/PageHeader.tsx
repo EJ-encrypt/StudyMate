@@ -22,8 +22,8 @@ export default function PageHeader({
           </span>
         )}
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">{title}</h1>
-          {subtitle && <div className="mt-0.5 text-sm text-navy/60">{subtitle}</div>}
+          <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">{title}</h1>
+          {subtitle && <div className="mt-0.5 text-sm text-ink/60">{subtitle}</div>}
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

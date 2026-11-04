@@ -96,7 +96,7 @@ export default function Login() {
           {isSubmitting ? "Logging in..." : "Log in"}
         </button>
       </form>
-      <p className="mt-6 text-sm text-navy/70">
+      <p className="mt-6 text-sm text-ink/70">
         New to StudyMate?{" "}
         <Link to="/register" className="font-semibold text-gold-dark hover:underline">
           Create an account

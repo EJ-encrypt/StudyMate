@@ -295,7 +295,7 @@ def test_document_is_only_completed_after_the_knowledge_base_is_updated(client, 
     provider.extract_concepts.return_value = [ExtractedConcept(name="Deadlock", summary="Waiting.")]
 
     with patch.object(extraction_worker, "SessionLocal", return_value=db), patch.object(
-        extraction_worker, "local_copy", return_value=nullcontext("lecture.pdf")
+        extraction_worker, "local_copy", return_value=nullcontext("lecture.txt")
     ), patch.object(
         extraction_worker, "extract_text", return_value="lecture text"
     ), patch.object(extraction_worker, "get_ai_provider", return_value=provider), patch.object(
@@ -382,7 +382,7 @@ def test_a_finished_document_queues_the_course_summary_as_its_own_job(client, db
     provider.extract_concepts.return_value = [ExtractedConcept(name="Deadlock", summary="Waiting.")]
 
     with patch.object(extraction_worker, "SessionLocal", return_value=db), patch.object(
-        extraction_worker, "local_copy", return_value=nullcontext("lecture.pdf")
+        extraction_worker, "local_copy", return_value=nullcontext("lecture.txt")
     ), patch.object(extraction_worker, "extract_text", return_value="lecture text"), patch.object(
         extraction_worker, "get_ai_provider", return_value=provider
     ), patch.object(extraction_worker, "sync_document_concepts"), patch.object(db, "close"):

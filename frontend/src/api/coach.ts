@@ -23,6 +23,18 @@ export interface CoachSummary {
   weak: number;
   unpractised: number;
   recommendations: ConceptProgress[];
+  /** At most five groups of related concepts to revise together. */
+  topics: RevisionTopic[];
+  /** Concepts needing work beyond those grouped into topics. */
+  more_to_revise: number;
+  concepts: ConceptProgress[];
+}
+
+export interface RevisionTopic {
+  /** Named after its most central concept. */
+  title: string;
+  summary: string;
+  status: ConceptStatus;
   concepts: ConceptProgress[];
 }
 
@@ -35,9 +47,9 @@ export const STATUS_LABELS: Record<ConceptStatus, string> = {
 
 export const STATUS_STYLES: Record<ConceptStatus, string> = {
   strong: "bg-green-100 text-green-800",
-  developing: "bg-gold/25 text-navy",
-  weak: "bg-red-100 text-red-800",
-  unpractised: "bg-navy/10 text-navy/70",
+  developing: "bg-gold/25 text-ink",
+  weak: "bg-red-100 text-red-700",
+  unpractised: "bg-ink/10 text-ink/70",
 };
 
 export async function getCoachSummary(courseId: string): Promise<CoachSummary> {

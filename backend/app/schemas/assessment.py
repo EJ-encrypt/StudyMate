@@ -10,7 +10,9 @@ class AssessmentCreate(BaseModel):
     """Either a single document, or a whole course for a cumulative paper."""
 
     kind: AssessmentKind
-    count: int = Field(default=10, ge=1, le=20)
+    # Omitted means "as many as the material supports": at least 20 for
+    # flashcards and multiple choice, scaling up with longer material.
+    count: int | None = Field(default=None, ge=1, le=40)
     document_id: uuid.UUID | None = None
     course_id: uuid.UUID | None = None
 

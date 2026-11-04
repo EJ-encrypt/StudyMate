@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Gamepad2, RotateCw, Send, Trophy, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Gamepad2, Send, Trophy, XCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -9,13 +9,14 @@ import {
   KIND_LABELS,
   submitAttempt,
 } from "../api/assessments";
+import FlashcardDeck from "../components/FlashcardDeck";
+import MathText from "../components/MathText";
 import { Alert, NewBadges, Spinner } from "../components/ui";
 
 export default function Quiz() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const [assessment, setAssessment] = useState<AssessmentDetail | null>(null);
   const [responses, setResponses] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,10 +66,10 @@ export default function Quiz() {
       <Link to={`/study/${assessment.course_id}`} className="btn-ghost -ml-2 mb-2">
         <ArrowLeft className="h-4 w-4" aria-hidden /> Back to course
       </Link>
-      <h1 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">{assessment.title}</h1>
-      <p className="mt-1 text-sm text-navy/60">
+      <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">{assessment.title}</h1>
+      <p className="mt-1 text-sm text-ink/60">
         {KIND_LABELS[assessment.kind]} · {assessment.items.length} items
-        {isFlashcards && " · tap a card to flip it"}
+        {isFlashcards && " · tap the card to flip it"}
       </p>
 
       {result && (
@@ -96,33 +97,7 @@ export default function Quiz() {
       )}
 
       {isFlashcards ? (
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-          {assessment.items.map((item) => {
-            const flipped = !!revealed[item.id];
-            return (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => setRevealed((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                  className={[
-                    "flex min-h-[9rem] w-full flex-col justify-between rounded-xl border p-4 text-left shadow-card transition",
-                    flipped ? "border-gold bg-gold/10" : "border-navy/10 bg-white hover:border-gold/60",
-                  ].join(" ")}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">
-                    {flipped ? "Answer" : `Card ${item.position}`}
-                  </span>
-                  <span className={flipped ? "text-navy" : "font-semibold text-navy"}>
-                    {flipped ? item.answer : item.question}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-navy/40">
-                    <RotateCw className="h-3 w-3" aria-hidden /> {flipped ? "Show question" : "Show answer"}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <FlashcardDeck items={assessment.items} />
       ) : (
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           {assessment.items.map((item, index) => {
@@ -136,11 +111,11 @@ export default function Quiz() {
                 ].join(" ")}
               >
                 <legend className="sr-only">Question {index + 1}</legend>
-                <p className="flex gap-2 font-semibold text-navy">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy/5 text-xs">
+                <p className="flex gap-2 font-semibold text-ink">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink/5 text-xs">
                     {index + 1}
                   </span>
-                  {item.question}
+                  <MathText text={item.question} />
                 </p>
 
                 {item.kind === "mcq" && (
@@ -159,7 +134,7 @@ export default function Quiz() {
                                 ? "border-red-300 bg-red-50"
                                 : chosen
                                   ? "border-gold bg-gold/10"
-                                  : "border-navy/15 hover:border-navy/30",
+                                  : "border-ink/15 hover:border-ink/30",
                           ].join(" ")}
                         >
                           <input
@@ -169,9 +144,9 @@ export default function Quiz() {
                             checked={chosen}
                             disabled={!!result}
                             onChange={() => setResponses((prev) => ({ ...prev, [item.id]: option }))}
-                            className="accent-navy"
+                            className="accent-ink"
                           />
-                          {option}
+                          <MathText text={option} />
                         </label>
                       );
                     })}
@@ -216,11 +191,15 @@ export default function Quiz() {
                       {answer.is_correct ? "Correct" : "Incorrect"}
                     </p>
                     {!answer.is_correct && (
-                      <p className="mt-1 text-navy">
-                        <span className="font-semibold">Model answer:</span> {answer.correct_answer}
+                      <p className="mt-1 text-ink">
+                        <span className="font-semibold">Model answer:</span> <MathText text={answer.correct_answer} />
                       </p>
                     )}
-                    {answer.explanation && <p className="mt-1 text-navy/70">{answer.explanation}</p>}
+                    {answer.explanation && (
+                      <p className="mt-1 text-ink/70">
+                        <MathText text={answer.explanation} />
+                      </p>
+                    )}
                   </div>
                 )}
               </fieldset>
@@ -230,8 +209,8 @@ export default function Quiz() {
           {error && <Alert>{error}</Alert>}
 
           {!result && (
-            <div className="sticky bottom-20 z-10 flex items-center justify-between gap-3 rounded-xl border border-navy/10 bg-white/95 p-3 shadow-lift backdrop-blur md:bottom-4">
-              <span className="text-sm text-navy/60">
+            <div className="sticky bottom-20 z-10 flex items-center justify-between gap-3 rounded-xl border border-ink/10 bg-surface/95 p-3 shadow-lift backdrop-blur md:bottom-4">
+              <span className="text-sm text-ink/60">
                 {answered} of {assessment.items.length} answered
               </span>
               <button type="submit" disabled={isSubmitting} className="btn-primary">

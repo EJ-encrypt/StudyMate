@@ -31,11 +31,12 @@ import {
 import { Course, getCourse } from "../api/courses";
 import { DocumentSummary, listDocuments } from "../api/documents";
 import PageHeader from "../components/PageHeader";
+import MathText from "../components/MathText";
 import { Alert, StatusPill } from "../components/ui";
 
 const KINDS: { kind: AssessmentKind; icon: LucideIcon; blurb: string }[] = [
-  { kind: "flashcard", icon: Layers, blurb: "Quick recall cards" },
-  { kind: "mcq", icon: ListChecks, blurb: "Four options each" },
+  { kind: "flashcard", icon: Layers, blurb: "Flip cards, both ways" },
+  { kind: "mcq", icon: ListChecks, blurb: "20+ questions" },
   { kind: "fill_blank", icon: TextCursorInput, blurb: "Recall the key term" },
   { kind: "short_answer", icon: PenLine, blurb: "Marked by AI" },
   { kind: "exam", icon: ScrollText, blurb: "A mixed paper" },
@@ -161,11 +162,13 @@ export default function StudyCourse() {
       <section className="card mb-5 p-4">
         <h2 className="section-title">What this course covers</h2>
         {course?.summary ? (
-          <p className="text-sm leading-relaxed text-navy/80">{course.summary}</p>
+          <p className="text-sm leading-relaxed text-ink/80">
+            <MathText text={course.summary} />
+          </p>
         ) : (
-          <p className="text-sm text-navy/50">An overview appears once your material has been processed.</p>
+          <p className="text-sm text-ink/50">An overview appears once your material has been processed.</p>
         )}
-        <p className="mt-3 text-xs text-navy/50">
+        <p className="mt-3 text-xs text-ink/50">
           {ready.length} of {documents.length} file{documents.length === 1 ? "" : "s"} ready
         </p>
       </section>
@@ -174,7 +177,7 @@ export default function StudyCourse() {
         <h2 className="section-title">Generate</h2>
 
         {ready.length === 0 ? (
-          <p className="card p-4 text-sm text-navy/60">Nothing is ready yet. Material has to finish processing first.</p>
+          <p className="card p-4 text-sm text-ink/60">Nothing is ready yet. Material has to finish processing first.</p>
         ) : pendingKind === null ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {KINDS.map(({ kind, icon: Icon, blurb }) => (
@@ -187,23 +190,23 @@ export default function StudyCourse() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-gold group-hover:bg-navy-light">
                   <Icon className="h-[18px] w-[18px]" aria-hidden />
                 </span>
-                <span className="mt-2 text-sm font-semibold text-navy">{KIND_LABELS[kind]}</span>
-                <span className="text-xs text-navy/50">{blurb}</span>
+                <span className="mt-2 text-sm font-semibold text-ink">{KIND_LABELS[kind]}</span>
+                <span className="text-xs text-ink/50">{blurb}</span>
               </button>
             ))}
           </div>
         ) : (
           <div className="card animate-fade-in p-4">
-            <p className="text-sm font-semibold text-navy">{KIND_LABELS[pendingKind]} — from what?</p>
+            <p className="text-sm font-semibold text-ink">{KIND_LABELS[pendingKind]} — from what?</p>
             <div className="mt-3 flex flex-col gap-2">
               <button
                 type="button"
                 disabled={isBusy}
                 onClick={() => generate(pendingKind, null)}
-                className="w-full rounded-lg border border-gold bg-gold/10 px-3 py-2 text-left text-sm font-semibold text-navy hover:bg-gold/20 disabled:opacity-50"
+                className="w-full rounded-lg border border-gold bg-gold/10 px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-gold/20 disabled:opacity-50"
               >
                 The whole course
-                <span className="ml-1 font-normal text-navy/60">— everything uploaded so far</span>
+                <span className="ml-1 font-normal text-ink/60">— everything uploaded so far</span>
               </button>
               {ready.map((document) => (
                 <button
@@ -211,7 +214,7 @@ export default function StudyCourse() {
                   type="button"
                   disabled={isBusy}
                   onClick={() => generate(pendingKind, document.id)}
-                  className="w-full truncate rounded-lg border border-navy/15 px-3 py-2 text-left text-sm text-navy hover:bg-navy/5 disabled:opacity-50"
+                  className="w-full truncate rounded-lg border border-ink/15 px-3 py-2 text-left text-sm text-ink hover:bg-ink/5 disabled:opacity-50"
                 >
                   {document.filename}
                 </button>
@@ -229,15 +232,15 @@ export default function StudyCourse() {
           <h2 className="section-title">
             <FileQuestion className="h-3.5 w-3.5" aria-hidden /> Generated
           </h2>
-          <ul className="card divide-y divide-navy/5">
+          <ul className="card divide-y divide-ink/5">
             {assessments.map((assessment) => {
               const Icon = KIND_ICONS[assessment.kind];
               return (
                 <li key={assessment.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy/40" aria-hidden />
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink/40" aria-hidden />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-navy">{assessment.title}</p>
+                      <p className="truncate text-sm font-semibold text-ink">{assessment.title}</p>
                       {assessment.status === "failed" && assessment.error_message && (
                         <p className="mt-0.5 text-xs text-red-600">{assessment.error_message}</p>
                       )}

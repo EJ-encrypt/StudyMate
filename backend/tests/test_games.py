@@ -169,7 +169,7 @@ def test_concept_match_round_and_scoring(client: TestClient, db: Session) -> Non
             "duration_ms": 30_000,
         },
     ).json()
-    assert result["score"] == games.concept_match_score(6, 0, 30_000)
+    assert result["score"] == games.concept_match_score(games.PAIRS_PER_ROUND, 0, 30_000)
     assert "perfect_memory" in {b["code"] for b in result["new_badges"]}
 
     stats = client.get(f"/games/{course_id}/stats", headers=headers).json()

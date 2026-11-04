@@ -155,3 +155,117 @@ def recommend(progress: list[ConceptProgress], limit: int = 5) -> list[ConceptPr
 
     ranked = sorted((p for p in progress if p.status != "strong"), key=rank)
     return ranked[:limit]
+
+
+# --- Revision topics --------------------------------------------------------
+
+# However many concepts need work, the Coach shows at most this many topics:
+# a list of twenty separate items read as a wall of failure and put students
+# off starting at all.
+MAX_TOPICS = 5
+# Only this many of the most urgent concepts are grouped; the rest stay in
+# the full concept list. Keeps the page focused, and the grouping cheap.
+MAX_GROUPED_CONCEPTS = 25
+# Related enough to revise together even when there is room for more topics.
+# Distinct but neighbouring concepts (Second and Third Normal Form) measured
+# 0.80 to 0.85, which is exactly the kind of pair worth revising as one.
+RELATED_SIMILARITY = 0.80
+
+_STATUS_SEVERITY = {"weak": 0, "unpractised": 1, "developing": 2, "strong": 3}
+
+
+@dataclass
+class RevisionTopic:
+    title: str
+    summary: str
+    status: str
+    concepts: list[ConceptProgress]
+
+
+def group_into_topics(
+    concepts: list[ConceptProgress],
+    embeddings: dict[uuid.UUID, tuple[list[float], str]],
+    max_topics: int = MAX_TOPICS,
+) -> list[RevisionTopic]:
+    """Group concepts needing revision into at most `max_topics` related topics.
+
+    Average-linkage clustering on the concept embeddings already stored for
+    the knowledge base: repeatedly merge the two most similar groups, until
+    there are few enough and the closest remaining pair is no longer
+    related. Concepts embedded by different models are never compared, since
+    their similarity would be meaningless; they are only merged when the
+    topic limit forces it.
+
+    `concepts` arrives in priority order, and topics keep that order: the
+    topic holding the most urgent concept comes first.
+    """
+    from app.services.knowledge_base import cosine_similarity
+
+    if not concepts:
+        return []
+
+    def similarity(a: ConceptProgress, b: ConceptProgress) -> float:
+        left, right = embeddings.get(a.concept_id), embeddings.get(b.concept_id)
+        if left is None or right is None or left[1] != right[1]:
+            return 0.0
+        return cosine_similarity(left[0], right[0])
+
+    pair = {
+        (i, j): similarity(concepts[i], concepts[j])
+        for i in range(len(concepts))
+        for j in range(i + 1, len(concepts))
+    }
+
+    def linkage(left: list[int], right: list[int]) -> float:
+        scores = [pair[(min(i, j), max(i, j))] for i in left for j in right]
+        return sum(scores) / len(scores)
+
+    groups: list[list[int]] = [[index] for index in range(len(concepts))]
+    while len(groups) > 1:
+        best, best_pair = -1.0, (0, 1)
+        for a in range(len(groups)):
+            for b in range(a + 1, len(groups)):
+                score = linkage(groups[a], groups[b])
+                if score > best:
+                    best, best_pair = score, (a, b)
+        if len(groups) <= max_topics and best < RELATED_SIMILARITY:
+            break
+        a, b = best_pair
+        groups[a] = sorted(groups[a] + groups[b])
+        del groups[b]
+
+    groups.sort(key=lambda members: members[0])
+    topics = []
+    for members in groups:
+        # Named after its most central concept: the one closest on average to
+        # the others, which best stands for the group as a whole.
+        centre = max(
+            members,
+            key=lambda i: sum(pair[(min(i, j), max(i, j))] for j in members if j != i),
+        )
+        group = [concepts[i] for i in members]
+        topics.append(
+            RevisionTopic(
+                title=concepts[centre].name,
+                summary=concepts[centre].summary,
+                status=min((c.status for c in group), key=lambda s: _STATUS_SEVERITY[s]),
+                concepts=group,
+            )
+        )
+    return topics
+
+
+def revision_topics(
+    db: Session, progress: list[ConceptProgress]
+) -> tuple[list[RevisionTopic], int]:
+    """The Coach's "revise these next": grouped topics, and how many were left out."""
+    needing = recommend(progress, limit=len(progress))
+    grouped = needing[:MAX_GROUPED_CONCEPTS]
+    ids = [concept.concept_id for concept in grouped]
+    embeddings = {
+        concept_id: (embedding, model)
+        for concept_id, embedding, model in db.query(
+            CourseConcept.id, CourseConcept.embedding, CourseConcept.embedding_model
+        ).filter(CourseConcept.id.in_(ids))
+    } if ids else {}
+    return group_into_topics(grouped, embeddings), len(needing) - len(grouped)

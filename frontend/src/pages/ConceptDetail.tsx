@@ -10,6 +10,7 @@ import {
 } from "../api/assessments";
 import { ConceptDetail as ConceptDetailData, STATUS_LABELS, STATUS_STYLES, getConceptDetail } from "../api/coach";
 import PageHeader from "../components/PageHeader";
+import MathText from "../components/MathText";
 import { Alert, Spinner, StatTile } from "../components/ui";
 
 const PRACTICE_KINDS: AssessmentKind[] = ["flashcard", "mcq", "short_answer"];
@@ -75,8 +76,10 @@ export default function ConceptDetail() {
       />
 
       <section className="mb-4 card p-4">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-navy/50">What this is</h2>
-        <p className="mt-1 text-sm text-navy/80">{concept.summary}</p>
+        <h2 className="text-xs font-bold uppercase tracking-wide text-ink/50">What this is</h2>
+        <p className="mt-1 text-sm text-ink/80">
+          <MathText text={concept.summary} />
+        </p>
       </section>
 
       <section className="mb-4 grid grid-cols-3 gap-3">
@@ -87,16 +90,16 @@ export default function ConceptDetail() {
 
       {concept.mentions.length > 0 && (
         <section className="mb-4 card p-4">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-navy/50">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-ink/50">
             How your material puts it
           </h2>
           <ul className="mt-1 flex flex-col gap-2">
             {concept.mentions.map((mention, index) => (
-              <li key={index} className="text-sm text-navy/80">
-                <span className="text-navy/50">
+              <li key={index} className="text-sm text-ink/80">
+                <span className="text-ink/50">
                   {concept.sources[index]?.filename ?? "Source"}:
                 </span>{" "}
-                {mention}
+                <MathText text={mention} />
               </li>
             ))}
           </ul>
@@ -104,10 +107,10 @@ export default function ConceptDetail() {
       )}
 
       <section className="rounded-xl border border-gold bg-gold/10 p-4">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-navy/60">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-ink/60">
           Practise this
         </h2>
-        <p className="mt-1 text-sm text-navy/75">
+        <p className="mt-1 text-sm text-ink/75">
           {concept.sources.length === 1
             ? `Generated from ${concept.sources[0].filename}.`
             : "Generated from the whole course, since this topic appears in several files."}

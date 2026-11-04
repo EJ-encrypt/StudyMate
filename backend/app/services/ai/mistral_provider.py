@@ -25,8 +25,10 @@ from app.core.config import settings
 from app.services.ai.alignment import align_grades
 from app.services.ai.base import (
     AIProvider,
+    CourseEntry,
     ExtractedConcept,
     GeneratedItem,
+    ItemDraft,
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
@@ -35,6 +37,7 @@ from app.services.ai.base import (
 from app.services.ai.prompts import (
     MAX_INPUT_CHARS,
     concept_extraction_prompt,
+    course_list_prompt,
     course_summary_prompt,
     generation_prompt,
     grading_prompt,
@@ -46,6 +49,10 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.mistral.ai/v1"
 _EMBEDDING_MODEL = "mistral-embed"
+# Mistral's document OCR model: reads a PDF or image into Markdown, writing
+# equations as LaTeX, which is exactly what maths material needs.
+_OCR_MODEL = "mistral-ocr-latest"
+_OCR_TIMEOUT_SECONDS = 180.0
 # Same reasoning as the Gemini adapter: a reply that has not come in a minute
 # is not worth waiting for when the hosting limit is five.
 _REQUEST_TIMEOUT_SECONDS = 60.0
@@ -67,7 +74,7 @@ class _ConceptList(BaseModel):
 
 
 class _ItemList(BaseModel):
-    items: list[GeneratedItem]
+    items: list[ItemDraft]
 
 
 class _GradeList(BaseModel):
@@ -89,6 +96,10 @@ class _CourseSummary(BaseModel):
 
 class _Timetable(BaseModel):
     entries: list[TimetableEntry]
+
+
+class _CourseList(BaseModel):
+    courses: list[CourseEntry]
 
 
 def strict_schema(model: type[BaseModel]) -> dict:
@@ -134,8 +145,10 @@ class MistralProvider(AIProvider):
     def embedding_model_id(self) -> str:
         return f"mistral:{_EMBEDDING_MODEL}"
 
-    def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]:
-        parsed = self._structured(concept_extraction_prompt(text, max_concepts), _ConceptList)
+    def extract_concepts(
+        self, text: str, max_concepts: int = 10, quantitative: bool = False
+    ) -> list[ExtractedConcept]:
+        parsed = self._structured(concept_extraction_prompt(text, max_concepts, quantitative), _ConceptList)
         return parsed.concepts[:max_concepts]
 
     def generate_assessment_items(
@@ -144,11 +157,14 @@ class MistralProvider(AIProvider):
         kind: ItemKind,
         count: int = 10,
         concepts: list[str] | None = None,
+        quantitative: bool = False,
+        avoid: list[str] | None = None,
     ) -> list[GeneratedItem]:
         parsed = self._structured(
-            generation_prompt(source_text[:MAX_INPUT_CHARS], kind, count, concepts), _ItemList
+            generation_prompt(source_text[:MAX_INPUT_CHARS], kind, count, concepts, quantitative, avoid),
+            _ItemList,
         )
-        return [item for item in parsed.items if item.kind == kind][:count]
+        return [item.to_item() for item in parsed.items if item.kind == kind][:count]
 
     def grade_short_answers(self, submissions: list[ShortAnswerSubmission]) -> list[ShortAnswerGrade]:
         if not submissions:
@@ -198,8 +214,37 @@ class MistralProvider(AIProvider):
             content.insert(0, {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{encoded}"}})
         return self._structured(content, _Timetable).entries
 
-    def _post(self, path: str, payload: dict) -> dict:
-        response = self._client.post(path, json=payload)
+    def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
+        if data and mime_type == "application/pdf":
+            extra_text = (extra_text + "\n" + _pdf_text(data)).strip()
+            if not extra_text:
+                raise ValueError("This PDF has no readable text for the backup model")
+            data = b""
+        content: list[dict] = [{"type": "text", "text": course_list_prompt(extra_text)}]
+        if data:
+            encoded = base64.b64encode(data).decode()
+            content.insert(0, {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{encoded}"}})
+        return self._structured(content, _CourseList).courses
+
+    def transcribe_document(self, data: bytes, mime_type: str) -> str:
+        encoded = base64.b64encode(data).decode()
+        url = f"data:{mime_type};base64,{encoded}"
+        document = (
+            {"type": "document_url", "document_url": url}
+            if mime_type == "application/pdf"
+            else {"type": "image_url", "image_url": url}
+        )
+        try:
+            body = self._post(
+                "/ocr", {"model": _OCR_MODEL, "document": document}, timeout=_OCR_TIMEOUT_SECONDS
+            )
+        except httpx.TimeoutException as exc:
+            raise MistralError(504, "OCR did not finish in time") from exc
+        pages = sorted(body.get("pages", []), key=lambda page: page.get("index", 0))
+        return "\n\n".join(page.get("markdown", "") for page in pages).strip()
+
+    def _post(self, path: str, payload: dict, timeout: float | None = None) -> dict:
+        response = self._client.post(path, json=payload, **({"timeout": timeout} if timeout else {}))
         if response.status_code >= 400:
             try:
                 message = response.json().get("message") or response.text

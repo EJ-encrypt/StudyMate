@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { MobileHeader, Sidebar, TabBar } from "./components/Nav";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Tutorial from "./components/Tutorial";
 import { useAuth } from "./context/AuthContext";
 import Arcade from "./pages/Arcade";
 import BeatTheClock from "./pages/BeatTheClock";
@@ -18,6 +19,7 @@ import Reflect from "./pages/Reflect";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Schedule from "./pages/Schedule";
+import Settings from "./pages/Settings";
 import StudyEngine from "./pages/StudyEngine";
 import StudyCourse from "./pages/StudyCourse";
 
@@ -39,7 +41,8 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-canvas">
+      <Tutorial />
       <Sidebar />
       <div className="min-w-0 flex-1">
         <MobileHeader />
@@ -63,6 +66,7 @@ export default function App() {
               <Route path="/coach" element={<Coach />} />
               <Route path="/coach/concept/:conceptId" element={<ConceptDetail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/quiz/:assessmentId" element={<Quiz />} />
             </Route>
             <Route path="/" element={<Navigate to="/courses" replace />} />

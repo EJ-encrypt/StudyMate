@@ -1,6 +1,8 @@
+import logging
+import re
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -9,9 +11,22 @@ from app.db.session import get_db
 from app.models.course import Course
 from app.models.document import CourseConcept, KnowledgeConcept, LectureDocument
 from app.models.user import User
-from app.schemas.course import CourseConceptRead, CourseCreate, CourseRead
+from app.schemas.course import (
+    CourseBulkCreate,
+    CourseConceptRead,
+    CourseCreate,
+    CourseProposal,
+    CourseRead,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
+
+
+def _code_key(code: str) -> str:
+    """Comparison form of a course code: "MATH 223", "math223" and "MATH-223" match."""
+    return re.sub(r"[^a-z0-9]", "", code.lower())
 
 
 @router.post("", response_model=CourseRead, status_code=201)
@@ -33,6 +48,92 @@ def create_course(
     db.commit()
     db.refresh(course)
     return _with_counts(db, [course])[0]
+
+
+@router.post("/read", response_model=list[CourseProposal])
+async def read_course_list(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[CourseProposal]:
+    """Read an uploaded course list into proposed courses.
+
+    Nothing is created here: a registration slip or handbook page usually
+    lists more than the student takes, so they tick which ones to add.
+    """
+    from app.services.ai import get_ai_provider
+    from app.services.failures import describe
+    from app.services.uploads import read_upload
+
+    data, mime_type, extra_text = await read_upload(file, "your course list")
+    try:
+        entries = get_ai_provider().read_course_list(data, mime_type, extra_text)
+    except Exception as exc:  # noqa: BLE001 -- reported to the student
+        logger.warning("Course list reading failed: %s", exc)
+        message, _ = describe(exc)
+        raise HTTPException(status_code=502, detail=message)
+
+    existing = {
+        _code_key(code)
+        for (code,) in db.query(Course.code).filter(Course.owner_id == current_user.id)
+    }
+    proposals: list[CourseProposal] = []
+    seen: set[str] = set()
+    for entry in entries:
+        name = entry.name.strip()[:255]
+        code = entry.code.strip()[:50]
+        if not name:
+            continue
+        key = _code_key(code) or _code_key(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        proposals.append(
+            CourseProposal(
+                code=code,
+                name=name,
+                level=entry.level if 100 <= entry.level <= 900 else None,
+                semester=entry.semester if entry.semester in (1, 2) else None,
+                already_added=bool(code) and _code_key(code) in existing,
+            )
+        )
+    if not proposals:
+        raise HTTPException(
+            status_code=422,
+            detail="No courses could be read from that file. Try a clearer photo, or add them by hand.",
+        )
+    return proposals
+
+
+@router.post("/bulk", response_model=list[CourseRead], status_code=201)
+def create_courses(
+    payload: CourseBulkCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[CourseRead]:
+    """Add the courses ticked after an import, skipping any already added."""
+    existing = {
+        _code_key(code)
+        for (code,) in db.query(Course.code).filter(Course.owner_id == current_user.id)
+    }
+    created: list[Course] = []
+    for entry in payload.courses:
+        key = _code_key(entry.code)
+        if key in existing:
+            continue
+        existing.add(key)
+        created.append(
+            Course(
+                name=entry.name,
+                code=entry.code,
+                owner_id=current_user.id,
+                level=entry.level or current_user.level or 100,
+                semester=entry.semester or current_user.semester or 1,
+            )
+        )
+    db.add_all(created)
+    db.commit()
+    return _with_counts(db, created)
 
 
 @router.get("", response_model=list[CourseRead])

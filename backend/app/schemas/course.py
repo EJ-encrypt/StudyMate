@@ -1,14 +1,33 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CourseCreate(BaseModel):
-    name: str
-    code: str
+    name: str = Field(min_length=1, max_length=255)
+    code: str = Field(min_length=1, max_length=50)
     # Default to the student's current level/semester when omitted.
-    level: int | None = None
-    semester: int | None = None
+    level: int | None = Field(default=None, ge=100, le=900)
+    semester: int | None = Field(default=None, ge=1, le=2)
+
+
+class CourseBulkCreate(BaseModel):
+    """The courses a student ticked after importing a course list."""
+
+    courses: list[CourseCreate] = Field(min_length=1, max_length=40)
+
+
+class CourseProposal(BaseModel):
+    """One course read from an uploaded list, for the student to confirm."""
+
+    code: str
+    name: str
+    # None when the document did not say.
+    level: int | None
+    semester: int | None
+    # Already in My Courses, so the page can show it as added rather than
+    # offering to create a duplicate.
+    already_added: bool
 
 
 class CourseRead(BaseModel):

@@ -44,7 +44,6 @@ class Settings(BaseSettings):
     # it fails for a transient reason, which on free tiers is common.
     ai_providers: str = "gemini"
     gemini_api_key: str = ""
-    openai_api_key: str = ""
     # Free "Experiment" plan key from console.mistral.ai; the backup provider.
     mistral_api_key: str = ""
     # Model lists are configuration, not code: providers retire models without
@@ -54,7 +53,6 @@ class Settings(BaseSettings):
     # minutes at a time while the lite models answered, and each failed model
     # in the list costs up to a minute before the next is tried.
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
-    openai_models: str = "gpt-4o-mini"
     mistral_models: str = "mistral-small-latest,mistral-medium-latest"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -70,10 +68,6 @@ class Settings(BaseSettings):
     @property
     def gemini_models_list(self) -> list[str]:
         return self._csv(self.gemini_models)
-
-    @property
-    def openai_models_list(self) -> list[str]:
-        return self._csv(self.openai_models)
 
     @property
     def mistral_models_list(self) -> list[str]:

@@ -21,6 +21,7 @@ from app.services.ai.base import (
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
+    CourseEntry,
     TimetableEntry,
 )
 
@@ -72,9 +73,11 @@ class FallbackProvider(AIProvider):
         assert last_error is not None
         raise last_error
 
-    def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]:
+    def extract_concepts(
+        self, text: str, max_concepts: int = 10, quantitative: bool = False
+    ) -> list[ExtractedConcept]:
         return self._first_that_works(
-            "extract_concepts", lambda p: p.extract_concepts(text, max_concepts)
+            "extract_concepts", lambda p: p.extract_concepts(text, max_concepts, quantitative)
         )
 
     def generate_assessment_items(
@@ -83,10 +86,14 @@ class FallbackProvider(AIProvider):
         kind: ItemKind,
         count: int = 10,
         concepts: list[str] | None = None,
+        quantitative: bool = False,
+        avoid: list[str] | None = None,
     ) -> list[GeneratedItem]:
         return self._first_that_works(
             "generate_assessment_items",
-            lambda p: p.generate_assessment_items(source_text, kind, count, concepts),
+            lambda p: p.generate_assessment_items(
+                source_text, kind, count, concepts, quantitative=quantitative, avoid=avoid
+            ),
         )
 
     def grade_short_answers(
@@ -114,6 +121,16 @@ class FallbackProvider(AIProvider):
         return self._first_that_works(
             "read_timetable",
             lambda p: p.read_timetable(data, mime_type, known_courses, extra_text),
+        )
+
+    def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
+        return self._first_that_works(
+            "read_course_list", lambda p: p.read_course_list(data, mime_type, extra_text)
+        )
+
+    def transcribe_document(self, data: bytes, mime_type: str) -> str:
+        return self._first_that_works(
+            "transcribe_document", lambda p: p.transcribe_document(data, mime_type)
         )
 
     def embed(self, texts: list[str]) -> list[list[float]]:

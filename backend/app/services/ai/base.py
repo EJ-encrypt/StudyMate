@@ -34,6 +34,46 @@ class GeneratedItem(BaseModel):
     concept: str
 
 
+class ItemDraft(BaseModel):
+    """What the model is asked to return for one item.
+
+    The same as GeneratedItem plus 'working', placed before 'answer'. Models
+    fill fields in schema order, so this makes them work a calculation out
+    before committing to its result instead of guessing the number first -
+    which is what made computed answers on maths material unreliable.
+    """
+
+    kind: ItemKind
+    question: str
+    working: str
+    answer: str
+    options: list[str]
+    explanation: str
+    concept: str
+
+    def to_item(self) -> GeneratedItem:
+        from app.services.latex import repair
+
+        return GeneratedItem(
+            kind=self.kind,
+            question=repair(self.question),
+            answer=repair(self.answer),
+            options=[repair(option) for option in self.options],
+            explanation=repair(self.explanation),
+            concept=self.concept,
+        )
+
+
+class CourseEntry(BaseModel):
+    """One course read from a course list or registration slip. No defaults, for Gemini."""
+
+    code: str
+    name: str
+    # 0 when the document does not say.
+    level: int
+    semester: int
+
+
 class ShortAnswerSubmission(BaseModel):
     """One short answer awaiting marking, keyed so grades can be matched back."""
 
@@ -74,7 +114,9 @@ class AIProvider(ABC):
         """
 
     @abstractmethod
-    def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]: ...
+    def extract_concepts(
+        self, text: str, max_concepts: int = 10, quantitative: bool = False
+    ) -> list[ExtractedConcept]: ...
 
     @abstractmethod
     def generate_assessment_items(
@@ -83,7 +125,15 @@ class AIProvider(ABC):
         kind: ItemKind,
         count: int = 10,
         concepts: list[str] | None = None,
-    ) -> list[GeneratedItem]: ...
+        quantitative: bool = False,
+        avoid: list[str] | None = None,
+    ) -> list[GeneratedItem]:
+        """Write one batch of items.
+
+        `quantitative` switches on the maths rules (LaTeX, worked problems,
+        mistake-based distractors); `avoid` lists questions an earlier batch of
+        the same set already asked.
+        """
 
     @abstractmethod
     def grade_short_answers(
@@ -123,3 +173,16 @@ class AIProvider(ABC):
         the fallback chain simply moves on to one that has it.
         """
         raise NotImplementedError(f"{type(self).__name__} cannot read timetables")
+
+    def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
+        """Read the courses on a course list, registration slip or handbook page."""
+        raise NotImplementedError(f"{type(self).__name__} cannot read course lists")
+
+    def transcribe_document(self, data: bytes, mime_type: str) -> str:
+        """Read a PDF or image into text, writing mathematics as LaTeX.
+
+        Used where plain text extraction loses what matters: equations in a
+        maths PDF come out of pdfplumber as scrambled symbols, and a photo of
+        notes has no text layer at all.
+        """
+        raise NotImplementedError(f"{type(self).__name__} cannot transcribe documents")

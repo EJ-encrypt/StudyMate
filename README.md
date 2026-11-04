@@ -92,8 +92,9 @@ backend/      FastAPI
   app/models/         SQLAlchemy models
   app/services/
     extraction/       per-format text extraction, dispatched by file type
-    ai/               AIProvider interface, Gemini and OpenAI adapters,
+    ai/               AIProvider interface, Gemini and Mistral adapters,
                       shared prompts, and the fallback chain
+    quantitative.py   spotting maths material, which is transcribed with LaTeX
     knowledge_base.py concept de-duplication and merging
     coaching.py       mastery, weak topics, recommendations
     gamification.py   XP, streaks, badges
@@ -123,16 +124,22 @@ cut off is retried rather than stuck. Marking written answers is the
 exception: it happens during submission so the student gets feedback in the
 same response.
 
-The LLM provider sits behind an `AIProvider` interface. Three adapters exist
-(Gemini, Mistral and OpenAI) and `AI_PROVIDERS` lists them in order: the first serves
-requests, the rest are tried when it fails. This is not hypothetical
+The LLM provider sits behind an `AIProvider` interface. Two adapters exist
+(Gemini and Mistral) and `AI_PROVIDERS` lists them in order: the first serves
+requests, the second is tried when it fails. This is not hypothetical
 robustness - on a free tier every Gemini model can be rate-limited at once,
-and within one provider there is nowhere left to go. The default chain is
-`gemini,mistral`, because both have free tiers; OpenAI has none.
+and within one provider there is nowhere left to go. Both have free tiers.
+An OpenAI adapter existed earlier and was removed: it has no free tier.
 
-The OpenAI adapter has not been exercised against the live API for want of a
-key. Model lists are configuration (`GEMINI_MODELS`, `OPENAI_MODELS`) so a
+Model lists are configuration (`GEMINI_MODELS`, `MISTRAL_MODELS`) so a
 retired or misspelled model is fixable without a code change.
+
+Question sets default to as many items as the material supports: at least
+20 flashcards or multiple-choice questions, up to 40, written in batches of
+20 so a later batch can be told what an earlier one asked. Maths, statistics
+and economics material is recognised by course name and symbol density; its
+PDFs and photos are transcribed by the AI with equations as LaTeX, its sets
+include worked problems, and numeric answers are marked as numbers.
 
 ## Project status
 

@@ -14,8 +14,9 @@ from app.schemas.coach import (
     ConceptDetailRead,
     ConceptProgressRead,
     ConceptSourceRead,
+    RevisionTopicRead,
 )
-from app.services.coaching import ConceptProgress, course_progress, recommend
+from app.services.coaching import ConceptProgress, course_progress, recommend, revision_topics
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
@@ -56,6 +57,8 @@ def coach_summary(
         else None
     )
 
+    topics, more_to_revise = revision_topics(db, progress)
+
     return CoachSummary(
         course_id=course_id,
         concept_count=len(progress),
@@ -65,6 +68,16 @@ def coach_summary(
         weak=by_status["weak"],
         unpractised=by_status["unpractised"],
         recommendations=[_as_read(p) for p in recommend(progress)],
+        topics=[
+            RevisionTopicRead(
+                title=topic.title,
+                summary=topic.summary,
+                status=topic.status,
+                concepts=[_as_read(c) for c in topic.concepts],
+            )
+            for topic in topics
+        ],
+        more_to_revise=more_to_revise,
         concepts=[_as_read(p) for p in progress],
     )
 

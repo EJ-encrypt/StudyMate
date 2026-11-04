@@ -12,8 +12,10 @@ from app.core.config import settings
 from app.services.ai.alignment import align_grades
 from app.services.ai.base import (
     AIProvider,
+    CourseEntry,
     ExtractedConcept,
     GeneratedItem,
+    ItemDraft,
     ItemKind,
     ShortAnswerGrade,
     ShortAnswerSubmission,
@@ -21,11 +23,13 @@ from app.services.ai.base import (
 )
 from app.services.ai.prompts import (
     concept_extraction_prompt,
+    course_list_prompt,
     generation_prompt,
     grading_prompt,
     course_summary_prompt,
     same_concept_prompt,
     timetable_prompt,
+    transcription_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +71,10 @@ _quota_cooldown_until: dict[str, float] = {}
 # run at all. A healthy reply takes 10-45s. A model that has not answered in a
 # minute is treated as overloaded and the next model is tried instead.
 _REQUEST_TIMEOUT_SECONDS = 60
+# Transcribing a whole PDF writes far more than any other call - every line of
+# the document back out - so it gets longer, while staying well inside the
+# five minutes a function may run for.
+_TRANSCRIBE_TIMEOUT_SECONDS = 180
 
 
 class _ConceptList(BaseModel):
@@ -74,7 +82,7 @@ class _ConceptList(BaseModel):
 
 
 class _ItemList(BaseModel):
-    items: list[GeneratedItem]
+    items: list[ItemDraft]
 
 
 class _GradeList(BaseModel):
@@ -98,6 +106,10 @@ class _Timetable(BaseModel):
     entries: list[TimetableEntry]
 
 
+class _CourseList(BaseModel):
+    courses: list[CourseEntry]
+
+
 class GeminiProvider(AIProvider):
     def __init__(self) -> None:
         self._client = genai.Client(
@@ -110,9 +122,11 @@ class GeminiProvider(AIProvider):
     def embedding_model_id(self) -> str:
         return f"gemini:{_EMBEDDING_MODEL}:{_EMBEDDING_DIM}"
 
-    def extract_concepts(self, text: str, max_concepts: int = 10) -> list[ExtractedConcept]:
+    def extract_concepts(
+        self, text: str, max_concepts: int = 10, quantitative: bool = False
+    ) -> list[ExtractedConcept]:
         response = self._generate_with_retry(
-            concept_extraction_prompt(text, max_concepts), _ConceptList
+            concept_extraction_prompt(text, max_concepts, quantitative), _ConceptList
         )
         parsed = _ConceptList.model_validate_json(response.text)
         return parsed.concepts[:max_concepts]
@@ -123,12 +137,14 @@ class GeminiProvider(AIProvider):
         kind: ItemKind,
         count: int = 10,
         concepts: list[str] | None = None,
+        quantitative: bool = False,
+        avoid: list[str] | None = None,
     ) -> list[GeneratedItem]:
         response = self._generate_with_retry(
-            generation_prompt(source_text, kind, count, concepts), _ItemList
+            generation_prompt(source_text, kind, count, concepts, quantitative, avoid), _ItemList
         )
         parsed = _ItemList.model_validate_json(response.text)
-        return [item for item in parsed.items if item.kind == kind][:count]
+        return [item.to_item() for item in parsed.items if item.kind == kind][:count]
 
     def grade_short_answers(
         self,
@@ -195,7 +211,27 @@ class GeminiProvider(AIProvider):
         response = self._generate_with_retry(contents, _Timetable)
         return _Timetable.model_validate_json(response.text).entries
 
-    def _generate_with_retry(self, prompt: str | list, schema: type[BaseModel]):
+    def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
+        contents: list = [course_list_prompt(extra_text)]
+        if data:
+            contents.insert(0, types.Part.from_bytes(data=data, mime_type=mime_type))
+        response = self._generate_with_retry(contents, _CourseList)
+        return _CourseList.model_validate_json(response.text).courses
+
+    def transcribe_document(self, data: bytes, mime_type: str) -> str:
+        response = self._generate_with_retry(
+            [types.Part.from_bytes(data=data, mime_type=mime_type), transcription_prompt()],
+            None,
+            timeout_seconds=_TRANSCRIBE_TIMEOUT_SECONDS,
+        )
+        return (response.text or "").strip()
+
+    def _generate_with_retry(
+        self,
+        prompt: str | list,
+        schema: type[BaseModel] | None,
+        timeout_seconds: int = _REQUEST_TIMEOUT_SECONDS,
+    ):
         """Retry transient failures, then fall back to the next model.
 
         Models whose quota is spent are skipped outright rather than retried:
@@ -211,12 +247,17 @@ class GeminiProvider(AIProvider):
 
             for attempt in range(1, _ATTEMPTS_PER_MODEL + 1):
                 try:
+                    structured = (
+                        {"response_mime_type": "application/json", "response_schema": schema}
+                        if schema is not None
+                        else {}
+                    )
                     return self._client.models.generate_content(
                         model=model,
                         contents=prompt,
                         config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            response_schema=schema,
+                            http_options=types.HttpOptions(timeout=timeout_seconds * 1000),
+                            **structured,
                         ),
                     )
                 except errors.APIError as exc:
@@ -248,9 +289,7 @@ class GeminiProvider(AIProvider):
                     # Waiting another minute on the same overloaded model is the
                     # slowest possible way to fail; move on to the next one.
                     last_error = exc
-                    logger.warning(
-                        "%s did not answer within %ss; falling back", model, _REQUEST_TIMEOUT_SECONDS
-                    )
+                    logger.warning("%s did not answer within %ss; falling back", model, timeout_seconds)
                     break
                 except (requests.exceptions.RequestException, httpx.TransportError) as exc:
                     last_error = exc

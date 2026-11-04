@@ -37,14 +37,14 @@ MAX_SPEED_BONUS = 100
 MAX_STREAK_MULTIPLIER = 2.0
 
 # Concept Match
-PAIRS_PER_ROUND = 6
+PAIRS_PER_ROUND = 8
 MIN_PAIRS = 3
 POINTS_PER_PAIR = 100
 MISTAKE_PENALTY = 15
 # Seconds per pair a student can take before the time bonus runs out.
 PAR_SECONDS_PER_PAIR = 10
 TIME_BONUS_PER_SECOND = 5
-CLUE_MAX_CHARS = 140
+CLUE_MAX_CHARS = 120
 
 
 class NotEnoughMaterial(ValueError):

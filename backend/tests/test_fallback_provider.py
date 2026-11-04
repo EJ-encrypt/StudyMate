@@ -61,7 +61,7 @@ def test_generation_falls_through() -> None:
 
     # Arguments must survive the hand-off unchanged, or the fallback would
     # quietly produce a different quiz from the one that was asked for.
-    second.generate_assessment_items.assert_called_once_with("text", ItemKind.MCQ, 5, ["A"])
+    second.generate_assessment_items.assert_called_once_with("text", ItemKind.MCQ, 5, ["A"], quantitative=False, avoid=None)
 
 
 def test_marking_falls_through() -> None:

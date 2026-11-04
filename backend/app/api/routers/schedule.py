@@ -2,7 +2,6 @@ import logging
 import re
 import uuid
 from datetime import time
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -27,12 +26,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
-# Under Vercel's 4.5MB request limit. The browser shrinks photos before
-# sending, so this only bites for an unusually large PDF.
-MAX_TIMETABLE_BYTES = 4 * 1024 * 1024
-
-_IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
-_TEXT_TYPES = {".docx", ".pptx", ".txt", ".md"}
 _HHMM = re.compile(r"^(\d{1,2}):(\d{2})")
 
 
@@ -179,31 +172,9 @@ async def read_timetable(
     Nothing is saved here: a misread time would mistime every reminder for the
     semester, so the student reviews and edits the rows first.
     """
-    data = await file.read()
-    if len(data) > MAX_TIMETABLE_BYTES:
-        raise HTTPException(status_code=400, detail="That file is too large (max 4MB). Try a screenshot instead.")
+    from app.services.uploads import read_upload
 
-    suffix = Path(file.filename or "").suffix.lower()
-    extra_text = ""
-    if suffix in _IMAGE_TYPES:
-        mime_type = _IMAGE_TYPES[suffix]
-    elif suffix == ".pdf":
-        mime_type = "application/pdf"
-    elif suffix in _TEXT_TYPES:
-        import tempfile
-
-        from app.services.extraction import extract_text
-
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / f"timetable{suffix}"
-            target.write_bytes(data)
-            extra_text = extract_text(str(target))
-        data, mime_type = b"", "text/plain"
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Upload a photo or screenshot (PNG, JPG, WEBP), a PDF, or a Word document.",
-        )
+    data, mime_type, extra_text = await read_upload(file, "your timetable")
 
     courses = db.query(Course).filter(Course.owner_id == current_user.id).all()
 

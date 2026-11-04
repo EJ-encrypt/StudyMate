@@ -1,11 +1,17 @@
 import logging
 import time
 import uuid
+from pathlib import Path
+
+from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
+from app.models.course import Course
 from app.models.document import DocumentStatus, KnowledgeConcept, LectureDocument
 from app.services.ai import get_ai_provider
-from app.services.extraction import extract_text
+from app.services.extraction import IMAGE_TYPES, extract_text, is_image
+from app.services.extraction.pdf import pdf_page_count
+from app.services.quantitative import has_garbled_text, is_quantitative_course, looks_mathematical
 from app.services.storage import local_copy
 from app.workers.jobs import REFRESH_COURSE_SUMMARY, enqueue
 from app.services.failures import describe
@@ -13,6 +19,74 @@ from app.services.gamification import record_document_processed
 from app.services.knowledge_base import sync_document_concepts
 
 logger = logging.getLogger(__name__)
+
+# Gemini takes at most 20MB in one request, and base64 adds a third; anything
+# larger keeps its plain extracted text.
+_MAX_TRANSCRIBE_BYTES = 14 * 1024 * 1024
+# Below this many characters per page a PDF is treated as scanned: whatever
+# text it has is page numbers and headers, not the content.
+_SCANNED_CHARS_PER_PAGE = 80
+
+
+def concept_budget(text: str) -> int:
+    """How many concepts to ask for: more for a long deck, so its later topics count."""
+    return max(10, min(20, len(text) // 3000))
+
+
+def _transcribe(path: str, mime_type: str) -> str:
+    data = Path(path).read_bytes()
+    if len(data) > _MAX_TRANSCRIBE_BYTES:
+        return ""
+    return get_ai_provider().transcribe_document(data, mime_type)
+
+
+def read_document(db: Session, document: LectureDocument) -> tuple[str, bool]:
+    """The document's text, and whether it is quantitative.
+
+    Plain extraction first, since it is instant and free. The AI transcribes
+    instead when that text is missing (a photo, a scanned PDF), garbled (maths
+    fonts), or from a quantitative course, where the equations are the point.
+    A transcription that fails falls back to the plain text when there is any,
+    so a busy model never costs a student an otherwise readable upload.
+
+    Stored on the document, so a retry after a timeout - and every quiz
+    generated later - reuses it rather than paying for it again.
+    """
+    course = db.get(Course, document.course_id)
+    course_is_quantitative = bool(course and is_quantitative_course(course.code, course.name))
+
+    if document.extracted_text:
+        text = document.extracted_text
+        return text, course_is_quantitative or looks_mathematical(text)
+
+    with local_copy(document.storage_path) as path:
+        text = extract_text(path)
+        suffix = Path(path).suffix.lower()
+        pages = pdf_page_count(path) if suffix == ".pdf" else 1
+        quantitative = course_is_quantitative or looks_mathematical(text)
+
+        needs_ai = is_image(path) or (
+            suffix == ".pdf"
+            and (quantitative or has_garbled_text(text) or len(text.strip()) < _SCANNED_CHARS_PER_PAGE * pages)
+        )
+        if needs_ai:
+            mime_type = IMAGE_TYPES.get(suffix, "application/pdf")
+            try:
+                transcribed = _transcribe(path, mime_type)
+            except Exception as exc:  # noqa: BLE001 -- plain text is the fallback
+                if not text.strip():
+                    raise
+                logger.warning("%s: transcription failed (%s); using extracted text", document.id, exc)
+                transcribed = ""
+            if transcribed:
+                text = transcribed
+                quantitative = quantitative or looks_mathematical(text)
+
+    if not text.strip():
+        raise ValueError("No readable text found in this document")
+    document.extracted_text = text
+    db.commit()
+    return text, quantitative
 
 
 def process_document(document_id: str) -> None:
@@ -27,11 +101,12 @@ def process_document(document_id: str) -> None:
         started = time.monotonic()
 
         try:
-            with local_copy(document.storage_path) as path:
-                text = extract_text(path)
-            if not text.strip():
-                raise ValueError("No readable text found in this document")
-            concepts = get_ai_provider().extract_concepts(text)
+            text, quantitative = read_document(db, document)
+            logger.info(
+                "%s: %s characters read (%s) at %.1fs",
+                document.id, len(text), "quantitative" if quantitative else "text", time.monotonic() - started,
+            )
+            concepts = get_ai_provider().extract_concepts(text, concept_budget(text), quantitative)
             logger.info("%s: %s concepts extracted at %.1fs", document.id, len(concepts), time.monotonic() - started)
         except Exception as exc:  # noqa: BLE001 -- surfaced to the student via document.error_message
             document.status = DocumentStatus.FAILED

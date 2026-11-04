@@ -34,16 +34,16 @@ export default function GameResultCard({
           <p className="mt-1 text-5xl font-extrabold tracking-tight">{result.score.toLocaleString()}</p>
           <p className="mt-1 text-sm text-white/60">Best: {result.personal_best.toLocaleString()}</p>
         </div>
-        <div className="grid grid-cols-2 divide-x divide-navy/5 border-b border-navy/5">
+        <div className="grid grid-cols-2 divide-x divide-ink/5 border-b border-ink/5">
           <div className="p-3">
-            <p className="text-xs text-navy/55">Correct</p>
-            <p className="text-lg font-bold text-navy">
+            <p className="text-xs text-ink/55">Correct</p>
+            <p className="text-lg font-bold text-ink">
               {result.correct}/{result.total}
             </p>
           </div>
           <div className="p-3">
-            <p className="text-xs text-navy/55">XP earned</p>
-            <p className="flex items-center justify-center gap-1 text-lg font-bold text-navy">
+            <p className="text-xs text-ink/55">XP earned</p>
+            <p className="flex items-center justify-center gap-1 text-lg font-bold text-ink">
               <Zap className="h-4 w-4 text-gold-dark" aria-hidden />+{result.xp_awarded}
             </p>
           </div>

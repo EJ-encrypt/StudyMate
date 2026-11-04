@@ -1,9 +1,13 @@
+import re
 import uuid
 from zoneinfo import available_timezones
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.user import UserRole
+
+
+_USERNAME = re.compile(r"^[a-z0-9_.]{3,30}$")
 
 
 def _valid_timezone(value: str | None) -> str | None:
@@ -18,6 +22,7 @@ class UserRead(BaseModel):
     id: uuid.UUID
     email: EmailStr
     full_name: str
+    username: str | None = None
     role: UserRole
     school: str | None = None
     programme: str | None = None
@@ -26,6 +31,7 @@ class UserRead(BaseModel):
     timezone: str = "Africa/Accra"
     notify_push: bool = True
     notify_email: bool = True
+    tutorial_seen: bool = False
 
     @property
     def needs_onboarding(self) -> bool:
@@ -51,9 +57,24 @@ class OnboardingUpdate(BaseModel):
 
 class PreferencesUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    # An empty string clears it.
+    username: str | None = None
+    level: int | None = Field(default=None, ge=100, le=900)
+    semester: int | None = Field(default=None, ge=1, le=2)
     timezone: str | None = None
     notify_push: bool | None = None
     notify_email: bool | None = None
+    tutorial_seen: bool | None = None
+
+    @field_validator("username")
+    @classmethod
+    def valid_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip().lstrip("@").lower()
+        if value and not _USERNAME.match(value):
+            raise ValueError("Use 3 to 30 letters, numbers, dots or underscores")
+        return value
 
     @field_validator("timezone")
     @classmethod

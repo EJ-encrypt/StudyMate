@@ -66,7 +66,8 @@ export const KIND_LABELS: Record<AssessmentKind, string> = {
 export async function createAssessment(
   documentId: string,
   kind: AssessmentKind,
-  count = 10,
+  /** Omitted: as many as the material supports (at least 20 flashcards or MCQs). */
+  count?: number,
 ): Promise<AssessmentSummary> {
   const { data } = await apiClient.post<AssessmentSummary>("/assessments", {
     document_id: documentId,
@@ -81,7 +82,8 @@ export async function createAssessment(
 export async function createCumulativeAssessment(
   courseId: string,
   kind: AssessmentKind,
-  count = 10,
+  /** Omitted: as many as the material supports (at least 20 flashcards or MCQs). */
+  count?: number,
 ): Promise<AssessmentSummary> {
   const { data } = await apiClient.post<AssessmentSummary>("/assessments", {
     course_id: courseId,

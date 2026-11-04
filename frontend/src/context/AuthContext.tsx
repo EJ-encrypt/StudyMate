@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
-import { fetchCurrentUser, UserProfile } from "../api/auth";
+import { deleteAccount as deleteAccountRequest, fetchCurrentUser, UserProfile } from "../api/auth";
 import { supabase } from "../lib/supabase";
 
 interface SignUpResult {
@@ -19,6 +19,10 @@ interface AuthContextValue {
   register: (email: string, password: string, fullName: string) => Promise<SignUpResult>;
   sendPasswordReset: (email: string) => Promise<void>;
   setNewPassword: (password: string) => Promise<void>;
+  /** Check the current password, then set a new one. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Delete the account and everything in it, then sign out. */
+  deleteAccount: () => Promise<void>;
   /** Re-read the profile, e.g. after onboarding changes it. */
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
@@ -115,6 +119,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsRecoveringPassword(false);
   }, []);
 
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!supabase) notConfigured();
+      const email = user?.email;
+      if (!email) throw new Error("Not signed in.");
+      // Supabase lets a signed-in session set any password without the old
+      // one, so a phone left unlocked could be locked out of its owner. Asking
+      // for the current password first closes that.
+      const { error: checkError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+      if (checkError) throw new Error("Your current password is not right.");
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+    },
+    [user?.email],
+  );
+
+  const deleteAccount = useCallback(async () => {
+    await deleteAccountRequest();
+    await supabase?.auth.signOut();
+    setUser(null);
+  }, []);
+
   const refresh = useCallback(async () => {
     setUser(await fetchCurrentUser());
   }, []);
@@ -135,6 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         sendPasswordReset,
         setNewPassword,
+        changePassword,
+        deleteAccount,
         refresh,
         logout,
       }}

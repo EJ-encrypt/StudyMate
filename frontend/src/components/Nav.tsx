@@ -1,11 +1,12 @@
 import {
+  Brain,
   CalendarClock,
   Gamepad2,
   GraduationCap,
   Library,
   LogOut,
   LucideIcon,
-  Sparkles,
+  Settings,
   Target,
   UserCircle,
 } from "lucide-react";
@@ -23,12 +24,15 @@ interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: "/courses", label: "My Courses", short: "Courses", icon: Library },
-  { to: "/study", label: "Study Engine", short: "Study", icon: Sparkles },
+  { to: "/study", label: "Study Engine", short: "Study", icon: Brain },
   { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2 },
   { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock },
   { to: "/coach", label: "Coach", short: "Coach", icon: Target },
   { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle },
 ];
+
+/** In the sidebar and the phone header, not the tab bar, which has no room for a seventh tab. */
+export const SETTINGS_ITEM: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings };
 
 function Brand() {
   return (
@@ -61,7 +65,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {[...NAV_ITEMS, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -99,7 +103,23 @@ export function MobileHeader() {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between bg-navy px-4 py-2.5 md:hidden">
       <Brand />
-      <span className="max-w-[45%] truncate text-xs text-white/60">{user.full_name}</span>
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="max-w-[40vw] truncate text-xs text-white/60">
+          {user.username ? `@${user.username}` : user.full_name}
+        </span>
+        <NavLink
+          to={SETTINGS_ITEM.to}
+          aria-label="Settings"
+          className={({ isActive }) =>
+            [
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
+              isActive ? "bg-white/10 text-gold" : "text-white/70 hover:bg-white/10 hover:text-white",
+            ].join(" ")
+          }
+        >
+          <Settings className="h-5 w-5" aria-hidden />
+        </NavLink>
+      </div>
     </header>
   );
 }
@@ -112,7 +132,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Main"
-      className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-navy/10 bg-white/95 backdrop-blur md:hidden"
+      className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-ink/10 bg-surface/95 backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-6">
         {NAV_ITEMS.map(({ to, short, icon: Icon }) => (
@@ -122,7 +142,7 @@ export function TabBar() {
             className={({ isActive }) =>
               [
                 "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
-                isActive ? "text-navy" : "text-navy/45",
+                isActive ? "text-ink" : "text-ink/45",
               ].join(" ")
             }
           >

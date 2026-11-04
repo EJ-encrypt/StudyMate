@@ -11,41 +11,99 @@ drift apart.
 
 from app.services.ai.base import ItemKind, ShortAnswerSubmission
 
-MAX_INPUT_CHARS = 20000
+# About 15K tokens: a long lecture deck fits whole, and both providers' free
+# tiers take it comfortably (Gemini's context is 1M, Mistral Small's 128K).
+# 20K, the earlier limit, cut off the second half of longer slide decks, so
+# every question came from the first few topics.
+MAX_INPUT_CHARS = 60000
+
+# Every kind gets these. They target what made earlier sets easy to game:
+# the right option was the longest and most qualified one, distractors were
+# obviously from another topic, and most questions only asked for a
+# definition back.
+_QUALITY_RULES = (
+    "Make the set genuinely test understanding:\n"
+    "- Spread the items across the whole material, not just its opening topics.\n"
+    "- At most a quarter of the items may simply ask for a definition. Write the "
+    "rest as application to a short scenario or example, comparison of two ideas, "
+    "cause and effect, spotting an error, ordering steps, or predicting an outcome.\n"
+    "- Never let the wording give the answer away: the question must not repeat a "
+    "distinctive word from the answer, and grammar (a/an, singular/plural) must not "
+    "point to it.\n"
+    "- No two items may test the same fact in the same way.\n"
+)
 
 ITEM_INSTRUCTIONS = {
     ItemKind.FLASHCARD: (
-        "Write {count} flashcards. 'question' is the prompt side, 'answer' is the "
-        "concise fact on the reverse. Leave 'options' empty."
+        "Write {count} flashcards as term/definition pairs. 'question' is the term, "
+        "name, formula or rule - at most eight words. 'answer' is its definition or "
+        "meaning in one or two sentences that do NOT contain the term itself, so the "
+        "card works in both directions: the student will sometimes see the term and "
+        "recall the definition, and sometimes see the definition and recall the term. "
+        "Leave 'options' empty."
     ),
     ItemKind.MCQ: (
         "Write {count} multiple-choice questions. 'question' is the stem, 'options' "
         "holds exactly four distinct answer choices, and 'answer' repeats the correct "
-        "option verbatim. Wrong options must be plausible. Use 'explanation' to say "
-        "briefly why the answer is right."
+        "option verbatim. Use 'explanation' to say briefly why the answer is right and "
+        "why the most tempting wrong option is wrong.\n"
+        "The wrong options matter as much as the right one:\n"
+        "- Each must be a real misconception or a near miss a student who half-knows "
+        "the topic would pick, drawn from the same material and the same category as "
+        "the answer (another term from this lecture, a neighbouring step, a related "
+        "value).\n"
+        "- All four options must have the same grammatical form and a similar length "
+        "and level of detail. The correct option must NOT be the longest, the most "
+        "qualified, or the only one that is precise.\n"
+        "- Never use 'All of the above', 'None of the above', joke options, or options "
+        "that are obviously off-topic."
     ),
     ItemKind.SHORT_ANSWER: (
         "Write {count} short-answer questions. 'question' asks for an explanation a "
         "student can give in one to three sentences, 'answer' is the model answer "
         "marking should accept, and 'explanation' notes the key points that must "
-        "appear for the answer to count. Leave 'options' empty."
+        "appear for the answer to count. Prefer 'why', 'how' and 'what would happen "
+        "if' questions over 'what is'. Leave 'options' empty."
     ),
     ItemKind.FILL_BLANK: (
         "Write {count} fill-in-the-blank questions. 'question' is a sentence with one "
         "missing term replaced by '_____', and 'answer' is only that term - one or two "
         "words, no punctuation. The blank must hide a meaningful piece of terminology "
         "the student should recall, never a symbol, operator or filler word, and enough "
-        "of the sentence must remain for the answer to be unambiguous. Leave 'options' "
-        "empty."
+        "of the sentence must remain for the answer to be unambiguous. Write 'a(n)' "
+        "rather than 'a' or 'an' before a blank. Leave 'options' empty."
     ),
 }
 
+# Added for maths, statistics, economics and similar material, where testing
+# recall of definitions misses the point: the skill is applying a method.
+_QUANTITATIVE_RULES = (
+    "This is quantitative material. Write all mathematics in LaTeX: $...$ inline, "
+    "$$...$$ for a displayed equation. Inside JSON, escape every backslash (\\\\frac).\n"
+    "At least half of the items must be worked problems: set fresh numbers or a "
+    "new function and ask for a result using a method from the material.\n"
+    "Before writing 'answer', work the problem out step by step in 'working'. "
+    "'answer' must agree with 'working'.\n"
+    "For multiple choice, each wrong option must be the result of one specific, "
+    "common mistake - a sign error, a wrong formula, a skipped step, a units or "
+    "off-by-one slip - so it looks right to a student who applies the method badly.\n"
+    "For fill in the blank on a calculation, the answer is the number alone: an "
+    "integer, or a decimal rounded to two places.\n"
+)
 
-def concept_extraction_prompt(text: str, max_concepts: int) -> str:
+
+def concept_extraction_prompt(text: str, max_concepts: int, quantitative: bool = False) -> str:
+    maths = (
+        " Where a concept is a formula, theorem or method, include the formula in "
+        "the summary, written in LaTeX between $ signs."
+        if quantitative
+        else ""
+    )
     return (
         f"Extract up to {max_concepts} key academic concepts from this lecture "
-        "material. For each concept give a short name and a one-sentence summary "
-        f"of what it means.\n\n{text[:MAX_INPUT_CHARS]}"
+        "material, covering all of it rather than only its opening. For each concept "
+        f"give a short name and a one-sentence summary of what it means.{maths}"
+        f"\n\n{text[:MAX_INPUT_CHARS]}"
     )
 
 
@@ -54,6 +112,8 @@ def generation_prompt(
     kind: ItemKind,
     count: int,
     concepts: list[str] | None = None,
+    quantitative: bool = False,
+    avoid: list[str] | None = None,
 ) -> str:
     if concepts:
         listed = "\n".join(f"- {name}" for name in concepts)
@@ -65,12 +125,28 @@ def generation_prompt(
     else:
         tagging = "Set 'concept' to the short name of the idea each item tests.\n"
 
+    working = (
+        "" if quantitative else "Leave 'working' empty unless an item needs a calculation.\n"
+    )
+    repeats = ""
+    if avoid:
+        # A large set is written in batches; this keeps a later batch from
+        # asking what an earlier one already did.
+        listed_avoid = "\n".join(f"- {question[:160]}" for question in avoid)
+        repeats = (
+            "These questions are already in the set. Do not repeat them or test the "
+            f"same point again:\n{listed_avoid}\n"
+        )
+
     return (
         "You are setting revision material from the lecture content below.\n"
         f"{ITEM_INSTRUCTIONS[kind].format(count=count)}\n"
+        f"{_QUALITY_RULES}"
+        f"{_QUANTITATIVE_RULES if quantitative else ''}"
+        f"{working}"
         f"Set 'kind' to '{kind.value}' on every item. Base every item strictly on "
         "the content provided - do not introduce outside material.\n"
-        f"{tagging}\n{source_text[:MAX_INPUT_CHARS]}"
+        f"{tagging}{repeats}\n{source_text[:MAX_INPUT_CHARS]}"
     )
 
 
@@ -149,4 +225,35 @@ def timetable_prompt(known_courses: list[tuple[str, str]], extra_text: str = "")
         "The student already has these courses; use the same code when a session "
         f"clearly matches one:\n{listed}"
         f"{text_block}"
+    )
+
+
+def course_list_prompt(extra_text: str = "") -> str:
+    """Read a course list, registration slip or handbook page.
+
+    The student picks which courses to keep afterwards, so the instruction is
+    to list everything legible rather than to guess at what they study.
+    """
+    text_block = f"\n\nDocument text:\n{extra_text[:MAX_INPUT_CHARS]}" if extra_text else ""
+    return (
+        "This document lists university courses - a registration slip, programme "
+        "handbook page, course outline or similar. List every course in it.\n"
+        "For each give: 'code' (the course code exactly as written, e.g. 'MATH 223', "
+        "or an empty string if none is shown), 'name' (the course title in title "
+        "case), 'level' (the year level as 100, 200, 300 ... if the document says "
+        "which year the course is in, otherwise 0) and 'semester' (1 or 2 if the "
+        "document says, otherwise 0).\n"
+        "List each course once. Skip headings, totals, credit counts and anything "
+        "that is not a course."
+        f"{text_block}"
+    )
+
+
+def transcription_prompt() -> str:
+    return (
+        "Transcribe this lecture material into plain text so it can be studied from. "
+        "Keep every heading, definition, worked example, formula and step. Write all "
+        "mathematics in LaTeX: $...$ inline and $$...$$ for displayed equations. "
+        "Describe a graph or diagram in one sentence in square brackets. Do not add "
+        "commentary, summaries or anything that is not in the material."
     )

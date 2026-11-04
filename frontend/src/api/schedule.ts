@@ -73,7 +73,7 @@ export async function deleteSlot(slotId: string): Promise<void> {
  * Shrink a phone photo before sending it: the API accepts at most 4MB, and
  * the AI reads a 2000px image as well as a 4000px one.
  */
-async function shrinkImage(file: File): Promise<Blob> {
+export async function shrinkImage(file: File): Promise<Blob> {
   if (!file.type.startsWith("image/") || file.size < 1.5 * 1024 * 1024) return file;
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));

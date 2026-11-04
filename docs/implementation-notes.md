@@ -309,7 +309,7 @@ failures and record them as infrastructure events, not usability defects.
 
 ## Verification performed
 
-- 206 automated backend tests, run against live PostgreSQL, including the
+- 232 automated backend tests, run against live PostgreSQL, including the
   job queue, Supabase token verification, the upload flow, games,
   timetable reading, reminder timing and idempotency, and the Mistral
   adapter against recorded API responses.

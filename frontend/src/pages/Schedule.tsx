@@ -288,7 +288,7 @@ export default function Schedule() {
       )}
 
       {isReading && (
-        <div className="card mb-5 flex items-center gap-3 p-4 text-sm text-navy/70">
+        <div className="card mb-5 flex items-center gap-3 p-4 text-sm text-ink/70">
           <FileImage className="h-5 w-5 text-gold-dark" aria-hidden />
           Reading your timetable. This can take up to a minute.
         </div>
@@ -298,8 +298,8 @@ export default function Schedule() {
         <section className="card mb-6 animate-fade-in p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-navy">Check what was read</h2>
-              <p className="text-sm text-navy/60">
+              <h2 className="font-semibold text-ink">Check what was read</h2>
+              <p className="text-sm text-ink/60">
                 Fix anything that is wrong and untick anything that is not a lecture. Nothing is saved until you
                 confirm.
               </p>
@@ -312,7 +312,7 @@ export default function Schedule() {
             {proposals.map((proposal, index) => (
               <li
                 key={index}
-                className={`flex items-start gap-3 rounded-lg border p-3 ${proposal.keep ? "border-navy/10" : "border-dashed border-navy/10 opacity-50"}`}
+                className={`flex items-start gap-3 rounded-lg border p-3 ${proposal.keep ? "border-ink/10" : "border-dashed border-ink/10 opacity-50"}`}
               >
                 <input
                   type="checkbox"
@@ -320,7 +320,7 @@ export default function Schedule() {
                   onChange={(e) =>
                     setProposals((prev) => prev!.map((p, i) => (i === index ? { ...p, keep: e.target.checked } : p)))
                   }
-                  className="mt-3 h-4 w-4 accent-navy"
+                  className="mt-3 h-4 w-4 accent-ink"
                   aria-label="Keep this lecture"
                 />
                 <div className="flex-1">
@@ -338,12 +338,12 @@ export default function Schedule() {
           </ul>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             {(slots?.length ?? 0) > 0 ? (
-              <label className="flex items-center gap-2 text-sm text-navy/70">
+              <label className="flex items-center gap-2 text-sm text-ink/70">
                 <input
                   type="checkbox"
                   checked={replaceExisting}
                   onChange={(e) => setReplaceExisting(e.target.checked)}
-                  className="h-4 w-4 accent-navy"
+                  className="h-4 w-4 accent-ink"
                 />
                 Replace my current timetable
               </label>
@@ -360,7 +360,7 @@ export default function Schedule() {
       {editing && (
         <form onSubmit={handleSave} className="card mb-6 animate-fade-in p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-navy">{editing.id ? "Edit lecture" : "Add a lecture"}</h2>
+            <h2 className="font-semibold text-ink">{editing.id ? "Edit lecture" : "Add a lecture"}</h2>
             <button type="button" onClick={() => setEditing(null)} className="btn-ghost" aria-label="Close">
               <X className="h-4 w-4" aria-hidden />
             </button>
@@ -402,7 +402,7 @@ export default function Schedule() {
               <div key={day}>
                 <h2 className="section-title">
                   {DAYS[day]}
-                  {day === today && <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] text-navy">Today</span>}
+                  {day === today && <span className="rounded-full bg-gold px-2 py-0.5 text-[10px] text-navy-dark">Today</span>}
                 </h2>
                 <ul className="space-y-2">
                   {byDay.get(day)!.map((slot) => (
@@ -412,11 +412,11 @@ export default function Schedule() {
                         <span className="text-sm font-bold">{hhmm(slot.start_time)}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-sm font-semibold text-navy">
+                        <p className="line-clamp-2 text-sm font-semibold text-ink">
                           {slot.course_code && <span className="mr-1.5 text-gold-dark">{slot.course_code}</span>}
                           {slot.title}
                         </p>
-                        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-navy/55">
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink/55">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" aria-hidden />
                             {hhmm(slot.start_time)}–{hhmm(slot.end_time)}

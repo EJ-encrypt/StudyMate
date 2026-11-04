@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { errorMessage } from "../api/client";
 import { ClockRound, GameResult, startBeatTheClock, submitBeatTheClock } from "../api/games";
 import GameResultCard from "../components/GameResultCard";
+import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
 
 type Phase = "loading" | "ready" | "countdown" | "playing" | "feedback" | "submitting" | "done";
@@ -176,15 +177,19 @@ export default function BeatTheClock() {
             {round.questions.map((q, i) => {
               const ok = result.answers[i]?.correct;
               return (
-                <li key={q.item_id} className="flex items-start gap-2 text-xs text-navy/70">
+                <li key={q.item_id} className="flex items-start gap-2 text-xs text-ink/70">
                   {ok ? (
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden />
                   ) : (
                     <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" aria-hidden />
                   )}
                   <span>
-                    <span className="text-navy">{q.question}</span>
-                    {!ok && <span className="block font-semibold text-navy">→ {q.answer}</span>}
+                    <MathText text={q.question} className="text-ink" />
+                    {!ok && (
+                      <span className="block font-semibold text-ink">
+                        → <MathText text={q.answer} />
+                      </span>
+                    )}
                   </span>
                 </li>
               );
@@ -218,11 +223,11 @@ export default function BeatTheClock() {
           </div>
           {phase === "ready" && (
             <div className="space-y-3 p-5">
-              <p className="text-sm text-navy/70">
+              <p className="text-sm text-ink/70">
                 Answer fast for bonus points. Get several right in a row to multiply your score.
               </p>
               {round.personal_best !== null && (
-                <p className="text-xs text-navy/50">Your best: {round.personal_best.toLocaleString()}</p>
+                <p className="text-xs text-ink/50">Your best: {round.personal_best.toLocaleString()}</p>
               )}
               <button
                 type="button"
@@ -247,20 +252,20 @@ export default function BeatTheClock() {
   return (
     <div className="mx-auto max-w-xl">
       <div className="mb-3 flex items-center justify-between text-sm">
-        <span className="font-semibold text-navy/60">
+        <span className="font-semibold text-ink/60">
           Question {index + 1} of {round.questions.length}
         </span>
         <span className="flex items-center gap-3">
           {streak >= 2 && (
-            <span className="flex animate-pop items-center gap-1 rounded-full bg-gold/25 px-2 py-0.5 text-xs font-bold text-navy">
+            <span className="flex animate-pop items-center gap-1 rounded-full bg-gold/25 px-2 py-0.5 text-xs font-bold text-ink">
               <Flame className="h-3.5 w-3.5 text-gold-dark" aria-hidden /> {streak} in a row
             </span>
           )}
-          <span className="font-bold text-navy">{score.toLocaleString()}</span>
+          <span className="font-bold text-ink">{score.toLocaleString()}</span>
         </span>
       </div>
 
-      <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-navy/10" aria-hidden>
+      <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-ink/10" aria-hidden>
         <div
           className={`h-full rounded-full transition-[width] duration-100 ease-linear ${
             fraction > 0.5 ? "bg-green-500" : fraction > 0.25 ? "bg-gold" : "bg-red-500"
@@ -275,7 +280,9 @@ export default function BeatTheClock() {
           showing ? (lastAnswer.correct ? "border-green-400" : "animate-shake border-red-300") : "",
         ].join(" ")}
       >
-        <p className="text-lg font-semibold leading-snug text-navy">{question?.question}</p>
+        <p className="text-lg font-semibold leading-snug text-ink">
+          <MathText text={question?.question ?? ""} />
+        </p>
 
         {question && question.options.length > 0 ? (
           <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
@@ -294,10 +301,10 @@ export default function BeatTheClock() {
                       ? "border-green-500 bg-green-50 text-green-800"
                       : chosen
                         ? "border-red-400 bg-red-50 text-red-700"
-                        : "border-navy/10 bg-white text-navy hover:border-gold hover:bg-gold/10 active:scale-[0.98]",
+                        : "border-ink/10 bg-surface text-ink hover:border-gold hover:bg-gold/10 active:scale-[0.98]",
                   ].join(" ")}
                 >
-                  {option}
+                  <MathText text={option} />
                 </button>
               );
             })}
@@ -330,8 +337,8 @@ export default function BeatTheClock() {
             {lastAnswer.correct
               ? `+${points(lastAnswer.time_ms, limitMs, streak)}`
               : lastAnswer.response
-                ? `It was: ${question?.answer}`
-                : `Time's up! It was: ${question?.answer}`}
+                ? <>It was: <MathText text={question?.answer ?? ""} /></>
+                : <>Time's up! It was: <MathText text={question?.answer ?? ""} /></>}
           </p>
         )}
       </div>

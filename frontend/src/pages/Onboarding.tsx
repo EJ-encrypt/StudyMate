@@ -41,10 +41,10 @@ export default function Onboarding() {
       <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-navy text-gold shadow-sm">
         <GraduationCap className="h-6 w-6" aria-hidden />
       </span>
-      <h1 className="text-2xl font-bold tracking-tight text-navy">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">
         Welcome{firstName ? `, ${firstName}` : ""}
       </h1>
-      <p className="mt-1 text-sm text-navy/60">
+      <p className="mt-1 text-sm text-ink/60">
         A few details, so your courses are filed under the right level and semester.
       </p>
 

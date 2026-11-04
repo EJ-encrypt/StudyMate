@@ -1,20 +1,22 @@
-import { ArrowLeft, Grid3x3, HelpCircle, Lightbulb, Timer, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Link2, Timer, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { errorMessage } from "../api/client";
-import { GameResult, MatchRound, startConceptMatch, submitConceptMatch } from "../api/games";
+import { GameResult, MatchPair, MatchRound, startConceptMatch, submitConceptMatch } from "../api/games";
 import GameResultCard from "../components/GameResultCard";
+import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
 
-interface Card {
-  key: string;
+type Side = "name" | "clue";
+
+interface Pick {
+  side: Side;
   conceptId: string;
-  kind: "name" | "clue";
-  text: string;
 }
 
-const MISMATCH_MS = 900;
+/** How long a wrong pair stays red before both cards reset. */
+const MISMATCH_MS = 750;
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -33,10 +35,12 @@ function formatTime(ms: number): string {
 export default function ConceptMatch() {
   const { courseId } = useParams<{ courseId: string }>();
   const [round, setRound] = useState<MatchRound | null>(null);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [flipped, setFlipped] = useState<string[]>([]);
+  // Each column is shuffled on its own, so a concept is rarely level with its meaning.
+  const [names, setNames] = useState<MatchPair[]>([]);
+  const [clues, setClues] = useState<MatchPair[]>([]);
+  const [selected, setSelected] = useState<Pick | null>(null);
   const [matched, setMatched] = useState<Set<string>>(new Set());
-  const [wrongPair, setWrongPair] = useState<string[]>([]);
+  const [wrong, setWrong] = useState<Pick[]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
@@ -49,22 +53,17 @@ export default function ConceptMatch() {
     setRound(null);
     setResult(null);
     setError(null);
-    setFlipped([]);
+    setSelected(null);
     setMatched(new Set());
+    setWrong([]);
     setMistakes(0);
     setElapsed(0);
     startedAt.current = null;
     startConceptMatch(courseId)
       .then((data) => {
         setRound(data);
-        setCards(
-          shuffle(
-            data.pairs.flatMap((pair) => [
-              { key: `${pair.concept_id}-name`, conceptId: pair.concept_id, kind: "name" as const, text: pair.name },
-              { key: `${pair.concept_id}-clue`, conceptId: pair.concept_id, kind: "clue" as const, text: pair.clue },
-            ]),
-          ),
-        );
+        setNames(shuffle(data.pairs));
+        setClues(shuffle(data.pairs));
       })
       .catch((err) => setError(errorMessage(err, "Could not start a round.")));
   }, [courseId]);
@@ -73,12 +72,12 @@ export default function ConceptMatch() {
 
   const finished = round !== null && matched.size === round.pairs.length;
 
-  // The clock starts on the first flip, so reading the rules is free.
+  // The clock starts on the first tap, so reading the cards first is free.
   useEffect(() => {
     if (startedAt.current === null || finished) return;
     const timer = setInterval(() => setElapsed(performance.now() - startedAt.current!), 250);
     return () => clearInterval(timer);
-  }, [flipped, finished]);
+  }, [selected, finished]);
 
   useEffect(() => {
     if (!finished || !round || !courseId || result || isSubmitting) return;
@@ -97,26 +96,29 @@ export default function ConceptMatch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
-  function flip(card: Card) {
-    if (matched.has(card.conceptId) || flipped.includes(card.key) || flipped.length === 2) return;
+  function choose(side: Side, conceptId: string) {
+    if (matched.has(conceptId) || wrong.length > 0) return;
     if (startedAt.current === null) startedAt.current = performance.now();
 
-    const next = [...flipped, card.key];
-    setFlipped(next);
-    if (next.length < 2) return;
-
-    const [first, second] = next.map((key) => cards.find((c) => c.key === key)!);
-    if (first.conceptId === second.conceptId) {
-      setMatched((prev) => new Set(prev).add(first.conceptId));
-      setFlipped([]);
-    } else {
-      setMistakes((n) => n + 1);
-      setWrongPair(next);
-      setTimeout(() => {
-        setFlipped([]);
-        setWrongPair([]);
-      }, MISMATCH_MS);
+    if (!selected || selected.side === side) {
+      // First pick, or changing your mind on the same side. Tapping the same
+      // card again puts it down.
+      setSelected(selected?.side === side && selected.conceptId === conceptId ? null : { side, conceptId });
+      return;
     }
+
+    if (selected.conceptId === conceptId) {
+      setMatched((prev) => new Set(prev).add(conceptId));
+      setSelected(null);
+      return;
+    }
+
+    setMistakes((n) => n + 1);
+    setWrong([selected, { side, conceptId }]);
+    setTimeout(() => {
+      setWrong([]);
+      setSelected(null);
+    }, MISMATCH_MS);
   }
 
   if (error && !round) {
@@ -138,7 +140,7 @@ export default function ConceptMatch() {
         courseId={round.course_id}
         onPlayAgain={load}
         detail={
-          <p className="text-sm text-navy/60">
+          <p className="text-sm text-ink/60">
             {formatTime(elapsed)} · {mistakes} wrong pair{mistakes === 1 ? "" : "s"}
           </p>
         }
@@ -146,24 +148,55 @@ export default function ConceptMatch() {
     );
   }
 
+  function card(pair: MatchPair, side: Side) {
+    const isMatched = matched.has(pair.concept_id);
+    const isSelected = selected?.side === side && selected.conceptId === pair.concept_id;
+    const isWrong = wrong.some((pick) => pick.side === side && pick.conceptId === pair.concept_id);
+    const text = side === "name" ? pair.name : pair.clue;
+    return (
+      <button
+        key={pair.concept_id}
+        type="button"
+        onClick={() => choose(side, pair.concept_id)}
+        disabled={isMatched}
+        aria-pressed={isSelected}
+        aria-label={`${side === "name" ? "Concept" : "Meaning"}: ${text}${isMatched ? " (matched)" : ""}`}
+        className={[
+          "flex min-h-[3.5rem] w-full items-center gap-2 rounded-xl border-2 px-3 py-2 text-left transition",
+          side === "name" ? "text-sm font-semibold" : "text-xs leading-snug sm:text-sm",
+          isMatched
+            ? "border-green-400 bg-green-50 text-green-900"
+            : isWrong
+              ? "animate-shake border-red-400 bg-red-50 text-red-700"
+              : isSelected
+                ? "border-gold bg-gold/15 text-ink shadow-lift ring-2 ring-gold/40"
+                : "border-ink/10 bg-surface text-ink hover:-translate-y-0.5 hover:border-gold/60 hover:shadow-lift",
+        ].join(" ")}
+      >
+        <MathText text={text} className="min-w-0 flex-1 break-words" />
+        {isMatched && <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" aria-hidden />}
+      </button>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold text-navy">
-            <Grid3x3 className="h-5 w-5" aria-hidden />
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold text-navy-dark">
+            <Link2 className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-bold leading-tight text-navy">Concept Match</h1>
-            <p className="text-xs text-navy/55">Pair each concept with its meaning.</p>
+            <h1 className="text-lg font-bold leading-tight text-ink">Concept Match</h1>
+            <p className="text-xs text-ink/55">Tap a concept, then the meaning that goes with it.</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-sm font-semibold text-navy">
+        <div className="flex items-center gap-4 text-sm font-semibold text-ink">
           <span className="flex items-center gap-1">
-            <Timer className="h-4 w-4 text-navy/50" aria-hidden /> {formatTime(elapsed)}
+            <Timer className="h-4 w-4 text-ink/50" aria-hidden /> {formatTime(elapsed)}
           </span>
           <span className="flex items-center gap-1">
-            <Lightbulb className="h-4 w-4 text-gold-dark" aria-hidden /> {matched.size}/{round.pairs.length}
+            <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden /> {matched.size}/{round.pairs.length}
           </span>
           <span className="flex items-center gap-1">
             <XCircle className="h-4 w-4 text-red-400" aria-hidden /> {mistakes}
@@ -171,46 +204,19 @@ export default function ConceptMatch() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
-        {cards.map((card) => {
-          const isMatched = matched.has(card.conceptId);
-          const isUp = isMatched || flipped.includes(card.key);
-          const isWrong = wrongPair.includes(card.key);
-          return (
-            <button
-              key={card.key}
-              type="button"
-              onClick={() => flip(card)}
-              disabled={isMatched}
-              aria-label={isUp ? card.text : "Hidden card"}
-              className={[
-                "flex aspect-[3/4] items-center justify-center rounded-xl border-2 p-2 text-center transition sm:aspect-[4/5] sm:p-3",
-                isMatched
-                  ? "animate-pop border-green-400 bg-green-50"
-                  : isWrong
-                    ? "animate-shake border-red-300 bg-red-50"
-                    : isUp
-                      ? card.kind === "name"
-                        ? "border-navy bg-navy text-white"
-                        : "border-gold bg-gold/10"
-                      : "border-navy/10 bg-gradient-to-br from-navy to-navy-light hover:-translate-y-0.5 hover:shadow-lift",
-              ].join(" ")}
-            >
-              {isUp ? (
-                <span
-                  className={[
-                    card.kind === "name" ? "text-xs font-bold sm:text-sm" : "text-[10px] leading-snug sm:text-xs",
-                    isMatched ? "text-green-900" : card.kind === "name" ? "text-white" : "text-navy",
-                  ].join(" ")}
-                >
-                  {card.text}
-                </span>
-              ) : (
-                <HelpCircle className="h-6 w-6 text-gold/70" aria-hidden />
-              )}
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 sm:gap-4">
+        <section aria-label="Concepts">
+          <h2 className="section-title">Concepts</h2>
+          <div className="flex flex-col gap-2">
+            {names.map((pair) => card(pair, "name"))}
+          </div>
+        </section>
+        <section aria-label="Meanings">
+          <h2 className="section-title">Meanings</h2>
+          <div className="flex flex-col gap-2">
+            {clues.map((pair) => card(pair, "clue"))}
+          </div>
+        </section>
       </div>
 
       {isSubmitting && <Spinner label="Saving your score..." />}

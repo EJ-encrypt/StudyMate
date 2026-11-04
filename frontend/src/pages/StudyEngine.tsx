@@ -1,4 +1,4 @@
-import { Library, Sparkles } from "lucide-react";
+import { Brain, Library } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -26,7 +26,7 @@ export default function StudyEngine() {
   return (
     <>
       <PageHeader
-        icon={Sparkles}
+        icon={Brain}
         title="Study Engine"
         subtitle="Pick a course to generate flashcards, quizzes and exam papers from your material."
       />

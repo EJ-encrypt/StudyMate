@@ -25,7 +25,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (val
       onClick={() => onChange(!checked)}
       className={[
         "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition",
-        checked ? "bg-navy" : "bg-navy/20",
+        checked ? "bg-navy" : "bg-ink/20",
       ].join(" ")}
     >
       <span
@@ -100,13 +100,13 @@ export default function NotificationSettings() {
   const pushOn = state === "on";
 
   return (
-    <div className="card divide-y divide-navy/5">
+    <div className="card divide-y divide-ink/5">
       <div className="flex items-start justify-between gap-4 p-4">
         <div className="flex gap-3">
-          <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-navy/50" aria-hidden />
+          <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-ink/50" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-navy">Notifications on this device</p>
-            <p className="text-xs text-navy/60">
+            <p className="text-sm font-semibold text-ink">Notifications on this device</p>
+            <p className="text-xs text-ink/60">
               {state === "needs-install" &&
                 "On iPhone and iPad: tap Share, then Add to Home Screen, and open StudyMate from there to turn this on."}
               {state === "unsupported" && "This browser cannot receive notifications. Email reminders still work."}
@@ -125,10 +125,10 @@ export default function NotificationSettings() {
 
       <div className="flex items-start justify-between gap-4 p-4">
         <div className="flex gap-3">
-          <Mail className="mt-0.5 h-5 w-5 shrink-0 text-navy/50" aria-hidden />
+          <Mail className="mt-0.5 h-5 w-5 shrink-0 text-ink/50" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-navy">Email reminders</p>
-            <p className="text-xs text-navy/60">
+            <p className="text-sm font-semibold text-ink">Email reminders</p>
+            <p className="text-xs text-ink/60">
               To {user?.email}
               {config && !config.email_available && " (Not set up on the server yet.)"}
             </p>
@@ -138,7 +138,7 @@ export default function NotificationSettings() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <p className="flex items-center gap-1.5 text-xs text-navy/55">
+        <p className="flex items-center gap-1.5 text-xs text-ink/55">
           {pushOn || user?.notify_email ? (
             <BellRing className="h-3.5 w-3.5" aria-hidden />
           ) : (

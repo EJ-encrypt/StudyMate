@@ -7,7 +7,7 @@ import {
   Loader2,
   NotebookPen,
   RotateCcw,
-  Sparkles,
+  Brain,
   UploadCloud,
 } from "lucide-react";
 import { DragEvent, FormEvent, useEffect, useRef, useState } from "react";
@@ -25,7 +25,7 @@ import {
 import PageHeader from "../components/PageHeader";
 import { Alert, EmptyState, StatusPill } from "../components/ui";
 
-const ACCEPTED = ".pdf,.docx,.pptx,.txt,.md";
+const ACCEPTED = ".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp";
 const MAX_BYTES = 20 * 1024 * 1024;
 
 function DocumentStatusPill({ status }: { status: DocumentSummary["status"] }) {
@@ -141,7 +141,7 @@ export default function CourseDetail() {
         errorMessage(
           err,
           mode === "files"
-            ? "Upload failed. Supported: PDF, DOCX, PPTX, TXT, MD (max 20MB each)."
+            ? "Upload failed. Supported: PDF, DOCX, PPTX, TXT, MD and photos (max 20MB each)."
             : "Could not save those notes.",
         ),
       );
@@ -166,14 +166,14 @@ export default function CourseDetail() {
           anyReady &&
           courseId && (
             <Link to={`/study/${courseId}`} className="btn-primary">
-              <Sparkles className="h-4 w-4" aria-hidden /> Study this course
+              <Brain className="h-4 w-4" aria-hidden /> Study this course
             </Link>
           )
         }
       />
 
       <section className="card mb-6 p-4">
-        <div className="mb-4 inline-flex rounded-lg bg-navy/5 p-1" role="tablist">
+        <div className="mb-4 inline-flex rounded-lg bg-ink/5 p-1" role="tablist">
           {(["files", "notes"] as Mode[]).map((option) => (
             <button
               key={option}
@@ -187,7 +187,7 @@ export default function CourseDetail() {
               }}
               className={[
                 "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition",
-                mode === option ? "bg-white text-navy shadow-sm" : "text-navy/60 hover:text-navy",
+                mode === option ? "bg-surface text-ink shadow-sm" : "text-ink/60 hover:text-ink",
               ].join(" ")}
             >
               {option === "files" ? (
@@ -212,12 +212,12 @@ export default function CourseDetail() {
                 onDrop={handleDrop}
                 className={[
                   "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition",
-                  isDragging ? "border-gold bg-gold/10" : "border-navy/15 hover:border-gold/60 hover:bg-gold/5",
+                  isDragging ? "border-gold bg-gold/10" : "border-ink/15 hover:border-gold/60 hover:bg-gold/5",
                 ].join(" ")}
               >
                 <UploadCloud className="h-8 w-8 text-gold-dark" aria-hidden />
-                <span className="mt-2 text-sm font-semibold text-navy">Drop files here, or tap to choose</span>
-                <span className="mt-0.5 text-xs text-navy/50">PDF, DOCX, PPTX, TXT or MD · up to 20MB each</span>
+                <span className="mt-2 text-sm font-semibold text-ink">Drop files here, or tap to choose</span>
+                <span className="mt-0.5 text-xs text-ink/50">PDF, slides, Word, notes or photos of notes · up to 20MB each</span>
                 <input
                   ref={fileInput}
                   id="file-input"
@@ -231,10 +231,10 @@ export default function CourseDetail() {
               {files.length > 0 && (
                 <ul className="space-y-1">
                   {files.map((file) => (
-                    <li key={file.name} className="flex items-center gap-2 text-sm text-navy/75">
-                      <FileText className="h-4 w-4 text-navy/40" aria-hidden />
+                    <li key={file.name} className="flex items-center gap-2 text-sm text-ink/75">
+                      <FileText className="h-4 w-4 text-ink/40" aria-hidden />
                       <span className="truncate">{file.name}</span>
-                      <span className="text-xs text-navy/40">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                      <span className="text-xs text-ink/40">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
                     </li>
                   ))}
                 </ul>
@@ -276,16 +276,16 @@ export default function CourseDetail() {
 
       {documents.length === 0 ? (
         <EmptyState icon={FileText} title="Nothing uploaded yet">
-          Upload lecture slides, PDFs or notes above. StudyMate reads them and pulls out the key concepts.
+          Upload lecture slides, PDFs, notes or photos of handwritten notes above. StudyMate reads them, equations included, and pulls out the key concepts.
         </EmptyState>
       ) : (
-        <ul className="card divide-y divide-navy/5">
+        <ul className="card divide-y divide-ink/5">
           {documents.map((document) => (
             <li key={document.id} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-navy/40" aria-hidden />
-                  <p className="truncate text-sm font-semibold text-navy">{document.filename}</p>
+                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-ink/40" aria-hidden />
+                  <p className="truncate text-sm font-semibold text-ink">{document.filename}</p>
                 </div>
                 <DocumentStatusPill status={document.status} />
               </div>

@@ -17,6 +17,16 @@ class ConceptProgressRead(BaseModel):
     last_seen_at: datetime | None
 
 
+class RevisionTopicRead(BaseModel):
+    """Related concepts to revise together, named after the most central one."""
+
+    title: str
+    summary: str
+    # The most urgent status among its concepts.
+    status: str
+    concepts: list[ConceptProgressRead]
+
+
 class CoachSummary(BaseModel):
     course_id: uuid.UUID
     concept_count: int
@@ -26,6 +36,10 @@ class CoachSummary(BaseModel):
     weak: int
     unpractised: int
     recommendations: list[ConceptProgressRead]
+    # At most five, however many concepts need work.
+    topics: list[RevisionTopicRead] = []
+    # Concepts needing work beyond those grouped into topics.
+    more_to_revise: int = 0
     concepts: list[ConceptProgressRead]
 
 

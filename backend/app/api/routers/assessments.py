@@ -275,7 +275,7 @@ def submit_attempt(
 @router.post("/{assessment_id}/retry", response_model=AssessmentRead)
 def retry_assessment(
     assessment_id: uuid.UUID,
-    count: int = 10,
+    count: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Assessment:

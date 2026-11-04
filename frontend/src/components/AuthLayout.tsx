@@ -1,11 +1,11 @@
-import { BellRing, Gamepad2, GraduationCap, Sparkles, Target } from "lucide-react";
+import { BellRing, Brain, Gamepad2, GraduationCap, Target } from "lucide-react";
 import { ReactNode } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { Alert } from "./ui";
 
 const FEATURES = [
-  { icon: Sparkles, text: "Quizzes, flashcards and exam papers from your own slides and notes" },
+  { icon: Brain, text: "Quizzes, flashcards and exam papers from your own slides and notes" },
   { icon: Gamepad2, text: "Revise with games: Beat the Clock and Concept Match" },
   { icon: BellRing, text: "Reminders before every lecture, and a nudge to capture what you learnt" },
   { icon: Target, text: "A coach that tracks every topic and tells you what to revise next" },
@@ -53,14 +53,14 @@ export default function AuthLayout({
 
       <section className="flex flex-1 items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm animate-fade-in">
-          <span className="mb-8 flex items-center gap-2 text-lg font-extrabold text-navy lg:hidden">
+          <span className="mb-8 flex items-center gap-2 text-lg font-extrabold text-ink lg:hidden">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy text-gold">
               <GraduationCap className="h-5 w-5" aria-hidden />
             </span>
             StudyMate
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-navy">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-navy/60">{subtitle}</p>}
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm text-ink/60">{subtitle}</p>}
           {!isConfigured && (
             <div className="mt-4">
               <Alert>
