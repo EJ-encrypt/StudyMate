@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     gemini_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
     mistral_models: str = "mistral-small-latest,mistral-medium-latest"
 
+    # AI work one student may ask for in any 24 hours (app/services/limits.py).
+    # Generous for real revision, but stops one account, or a script using
+    # it, from spending the whole free AI quota for everyone else.
+    limit_generate_per_day: int = 30
+    limit_documents_per_day: int = 40
+    limit_reads_per_day: int = 15
+    limit_grading_per_day: int = 60
+
+    # Error reporting (Sentry). Off when empty.
+    sentry_dsn: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @staticmethod

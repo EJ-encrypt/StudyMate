@@ -34,7 +34,9 @@ import {
 } from "../api/schedule";
 import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
-import { Alert, EmptyState, Spinner } from "../components/ui";
+import { Alert, EmptyState, ListSkeleton } from "../components/ui";
+import { enablePush, getNotificationConfig, pushState } from "../lib/push";
+import { toast, undoable } from "../lib/toast";
 
 const BLANK: SlotInput = {
   title: "",
@@ -174,10 +176,12 @@ export default function Schedule() {
     setIsSaving(true);
     setError(null);
     try {
+      const isNew = !editing.id;
       if (editing.id) await updateSlot(editing.id, editing.value);
       else await createSlot(editing.value);
       setEditing(null);
       await refresh();
+      if (isNew) void offerReminders("Lecture saved.");
     } catch (err) {
       setError(errorMessage(err, "Could not save that lecture. Check the end time is after the start."));
     } finally {
@@ -185,10 +189,47 @@ export default function Schedule() {
     }
   }
 
-  async function handleDelete(slot: LectureSlot) {
-    if (!window.confirm(`Remove ${slot.title} on ${DAYS[slot.day_of_week]}?`)) return;
-    await deleteSlot(slot.id);
-    await refresh();
+  function handleDelete(slot: LectureSlot) {
+    undoable({
+      text: `${slot.title} on ${DAYS[slot.day_of_week]} removed.`,
+      hide: () => setSlots((current) => current?.filter((s) => s.id !== slot.id) ?? current),
+      restore: () => void refresh(),
+      commit: async () => {
+        await deleteSlot(slot.id);
+        await refresh();
+      },
+    });
+  }
+
+  /**
+   * Notification permission is asked for here, right after a lecture is
+   * added, when a reminder obviously helps; asked on a first visit, most
+   * people say no and the browser never asks again.
+   */
+  async function offerReminders(saved: string) {
+    const state = await pushState().catch(() => "unsupported" as const);
+    if (state !== "off") {
+      toast(saved);
+      return;
+    }
+    toast(`${saved} Get a reminder an hour before each lecture?`, {
+      kind: "info",
+      duration: 10000,
+      action: {
+        label: "Turn on",
+        onClick: async () => {
+          try {
+            const config = await getNotificationConfig();
+            const result = await enablePush(config.vapid_public_key);
+            toast(result === "on" ? "Reminders are on for this device." : "Reminders stay off. You can turn them on below.", {
+              kind: result === "on" ? "success" : "info",
+            });
+          } catch {
+            toast("Could not turn on reminders. Try the switch under Reminders.", { kind: "error" });
+          }
+        },
+      },
+    });
   }
 
   async function handleFile(file: File | undefined) {
@@ -229,6 +270,7 @@ export default function Schedule() {
       );
       setProposals(null);
       setNotice(`Saved ${chosen.length} lecture${chosen.length === 1 ? "" : "s"}. Reminders are on their way.`);
+      void offerReminders(`Saved ${chosen.length} lecture${chosen.length === 1 ? "" : "s"}.`);
       await refresh();
     } catch (err) {
       setError(errorMessage(err, "Could not save those lectures. Check each one has a valid time."));
@@ -372,7 +414,7 @@ export default function Schedule() {
         </form>
       )}
 
-      {slots === null && <Spinner />}
+      {slots === null && <ListSkeleton rows={3} />}
 
       {slots?.length === 0 && !proposals && !editing && (
         <EmptyState

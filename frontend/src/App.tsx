@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import InstallPrompt from "./components/InstallPrompt";
 import { MobileHeader, Sidebar, TabBar } from "./components/Nav";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Toaster from "./components/Toaster";
 import Tutorial from "./components/Tutorial";
 import { useAuth } from "./context/AuthContext";
 import Arcade from "./pages/Arcade";
@@ -19,6 +21,7 @@ import Profile from "./pages/Profile";
 import Quiz from "./pages/Quiz";
 import Reflect from "./pages/Reflect";
 import Register from "./pages/Register";
+import Review from "./pages/Review";
 import ResetPassword from "./pages/ResetPassword";
 import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
@@ -52,6 +55,7 @@ export default function App() {
         <MobileHeader />
         <RequireOnboarding />
         <main className={user ? "mx-auto max-w-5xl px-4 pb-24 pt-5 sm:px-6 md:pb-10 md:pt-8" : ""}>
+          {user?.school && <InstallPrompt />}
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -73,6 +77,7 @@ export default function App() {
               <Route path="/lectures/:slotId/reflect" element={<Reflect />} />
               <Route path="/coach" element={<Coach />} />
               <Route path="/coach/concept/:conceptId" element={<ConceptDetail />} />
+              <Route path="/review/:courseId" element={<Review />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/quiz/:assessmentId" element={<Quiz />} />
@@ -84,6 +89,7 @@ export default function App() {
           </Routes>
         </main>
         <TabBar />
+        <Toaster />
       </div>
     </div>
   );

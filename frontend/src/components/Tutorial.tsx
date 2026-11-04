@@ -40,7 +40,7 @@ export const STEPS: Step[] = [
   {
     icon: UploadCloud,
     title: "2. Upload your material",
-    body: "Open a course and upload its slides, PDFs, Word documents, notes, or photos of handwritten notes. StudyMate reads each file and pulls out the key concepts, usually within a minute or two.",
+    body: "Open a course and upload its slides, PDFs or Word documents, type notes, or photograph the pages of notes you wrote in a book. StudyMate reads them, handwriting included, and pulls out the key concepts, usually within a minute or two.",
     tip: "Maths, statistics and economics files are read with their equations intact.",
   },
   {
@@ -52,7 +52,7 @@ export const STEPS: Step[] = [
   {
     icon: Gamepad2,
     title: "4. Play in the Arcade",
-    body: "Beat the Clock races you through your own questions. Concept Match has you pair concepts with their meanings. Both earn XP and badges.",
+    body: "Five games built from your own material, from Beat the Clock to Three Strikes. They earn XP and badges, and you can challenge friends to beat your score on the Leaderboard.",
   },
   {
     icon: CalendarClock,
@@ -62,12 +62,12 @@ export const STEPS: Step[] = [
   {
     icon: CoachIcon,
     title: "6. Follow your Coach",
-    body: "The Coach tracks how well you know every concept from the questions you answer, and picks up to five topics to revise next.",
+    body: "The Coach tracks how well you know every concept from the questions you answer, picks up to five topics to revise next, and tells you when flashcards are due again.",
   },
   {
     icon: Settings,
     title: "7. Make it yours",
-    body: "In Settings you can switch between light and dark mode, choose how reminders reach you, set a username, and change your password.",
+    body: "In Settings you can switch between light and dark mode, set a daily study goal, choose how reminders reach you, set a username, and change your password.",
     tip: "You can replay this tutorial from Settings at any time.",
   },
 ];

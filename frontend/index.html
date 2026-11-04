@@ -18,16 +18,7 @@
       rel="stylesheet"
     />
     <title>StudyMate</title>
-    <script>
-      // Before the page draws, so dark mode never flashes white first.
-      // Kept in step with src/lib/theme.ts.
-      (function () {
-        var choice = "system";
-        try { choice = localStorage.getItem("studymate-theme") || "system"; } catch (e) {}
-        var dark = choice === "dark" || (choice !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        if (dark) document.documentElement.classList.add("dark");
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

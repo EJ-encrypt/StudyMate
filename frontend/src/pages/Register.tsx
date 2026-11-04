@@ -3,8 +3,10 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import AuthLayout from "../components/AuthLayout";
-import { Alert } from "../components/ui";
+import GoogleSignIn from "../components/GoogleSignIn";
+import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { Captcha, captchaEnabled } from "../lib/captcha";
 
 export default function Register() {
   const { register } = useAuth();
@@ -15,6 +17,9 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // A captcha token works once, so the check is redone after every attempt.
+  const [captchaRound, setCaptchaRound] = useState(0);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -25,7 +30,7 @@ export default function Register() {
     }
     setIsSubmitting(true);
     try {
-      const { needsConfirmation } = await register(email, password, fullName.trim());
+      const { needsConfirmation } = await register(email, password, fullName.trim(), captchaToken ?? undefined);
       if (needsConfirmation) setAwaitingConfirmation(true);
       else navigate("/welcome");
     } catch (err) {
@@ -33,6 +38,7 @@ export default function Register() {
       setError(
         /already registered/i.test(message) ? "That email already has an account. Try logging in." : message,
       );
+      setCaptchaRound((round) => round + 1);
     } finally {
       setIsSubmitting(false);
     }
@@ -63,6 +69,7 @@ export default function Register() {
 
   return (
     <AuthLayout title="Create your account" subtitle="Free for students. Takes under a minute.">
+      <GoogleSignIn />
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label>
           <span className="label">Full name</span>
@@ -88,19 +95,19 @@ export default function Register() {
         </label>
         <label>
           <span className="label">Password</span>
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="input mt-1"
+            className="mt-1"
           />
           <span className="mt-1 block text-xs text-ink/50">At least 8 characters.</span>
         </label>
+        <Captcha key={captchaRound} onToken={setCaptchaToken} />
         {error && <Alert>{error}</Alert>}
-        <button type="submit" disabled={isSubmitting} className="btn-primary mt-1 py-2.5">
+        <button type="submit" disabled={isSubmitting || (captchaEnabled && !captchaToken)} className="btn-primary mt-1 py-2.5">
           <UserPlus className="h-4 w-4" aria-hidden />
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>

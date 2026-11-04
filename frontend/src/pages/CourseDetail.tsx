@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  Camera,
   CheckCircle2,
   Clock,
   FileText,
@@ -23,6 +24,7 @@ import {
   uploadDocuments,
 } from "../api/documents";
 import PageHeader from "../components/PageHeader";
+import PhotoNotes from "../components/PhotoNotes";
 import { Alert, EmptyState, StatusPill } from "../components/ui";
 
 const ACCEPTED = ".pdf,.docx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp";
@@ -57,7 +59,13 @@ function DocumentStatusPill({ status }: { status: DocumentSummary["status"] }) {
   }
 }
 
-type Mode = "files" | "notes";
+type Mode = "files" | "notes" | "photos";
+
+const MODES: { mode: Mode; label: string; icon: typeof Camera }[] = [
+  { mode: "files", label: "Upload files", icon: UploadCloud },
+  { mode: "notes", label: "Type notes", icon: NotebookPen },
+  { mode: "photos", label: "Photograph notes", icon: Camera },
+];
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -173,8 +181,8 @@ export default function CourseDetail() {
       />
 
       <section className="card mb-6 p-4">
-        <div className="mb-4 inline-flex rounded-lg bg-ink/5 p-1" role="tablist">
-          {(["files", "notes"] as Mode[]).map((option) => (
+        <div className="mb-4 flex w-full rounded-lg bg-ink/5 p-1 sm:inline-flex sm:w-auto" role="tablist">
+          {MODES.map(({ mode: option, label, icon: Icon }) => (
             <button
               key={option}
               type="button"
@@ -186,88 +194,88 @@ export default function CourseDetail() {
                 setNotice(null);
               }}
               className={[
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition",
+                "flex flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-xs font-semibold transition sm:flex-none sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm",
                 mode === option ? "bg-surface text-ink shadow-sm" : "text-ink/60 hover:text-ink",
               ].join(" ")}
             >
-              {option === "files" ? (
-                <UploadCloud className="h-4 w-4" aria-hidden />
-              ) : (
-                <NotebookPen className="h-4 w-4" aria-hidden />
-              )}
-              {option === "files" ? "Upload files" : "Type notes"}
+              <Icon className="h-4 w-4" aria-hidden />
+              {label}
             </button>
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {mode === "files" ? (
-            <>
-              <label
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                className={[
-                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition",
-                  isDragging ? "border-gold bg-gold/10" : "border-ink/15 hover:border-gold/60 hover:bg-gold/5",
-                ].join(" ")}
-              >
-                <UploadCloud className="h-8 w-8 text-gold-dark" aria-hidden />
-                <span className="mt-2 text-sm font-semibold text-ink">Drop files here, or tap to choose</span>
-                <span className="mt-0.5 text-xs text-ink/50">PDF, slides, Word, notes or photos of notes · up to 20MB each</span>
+        {mode === "photos" && courseId ? (
+          <PhotoNotes courseId={courseId} onUploaded={refresh} />
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            {mode === "files" ? (
+              <>
+                <label
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  className={[
+                    "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition",
+                    isDragging ? "border-gold bg-gold/10" : "border-ink/15 hover:border-gold/60 hover:bg-gold/5",
+                  ].join(" ")}
+                >
+                  <UploadCloud className="h-8 w-8 text-gold-dark" aria-hidden />
+                  <span className="mt-2 text-sm font-semibold text-ink">Drop files here, or tap to choose</span>
+                  <span className="mt-0.5 text-xs text-ink/50">PDF, slides, Word, notes or photos of notes · up to 20MB each</span>
+                  <input
+                    ref={fileInput}
+                    id="file-input"
+                    type="file"
+                    multiple
+                    accept={ACCEPTED}
+                    onChange={(e) => choose(Array.from(e.target.files ?? []))}
+                    className="sr-only"
+                  />
+                </label>
+                {files.length > 0 && (
+                  <ul className="space-y-1">
+                    {files.map((file) => (
+                      <li key={file.name} className="flex items-center gap-2 text-sm text-ink/75">
+                        <FileText className="h-4 w-4 text-ink/40" aria-hidden />
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-xs text-ink/40">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <>
                 <input
-                  ref={fileInput}
-                  id="file-input"
-                  type="file"
-                  multiple
-                  accept={ACCEPTED}
-                  onChange={(e) => choose(Array.from(e.target.files ?? []))}
-                  className="sr-only"
+                  type="text"
+                  placeholder="Title, e.g. Week 5 - Normalization"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={120}
+                  className="input"
                 />
-              </label>
-              {files.length > 0 && (
-                <ul className="space-y-1">
-                  {files.map((file) => (
-                    <li key={file.name} className="flex items-center gap-2 text-sm text-ink/75">
-                      <FileText className="h-4 w-4 text-ink/40" aria-hidden />
-                      <span className="truncate">{file.name}</span>
-                      <span className="text-xs text-ink/40">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <>
-              <input
-                type="text"
-                placeholder="Title, e.g. Week 5 - Normalization"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={120}
-                className="input"
-              />
-              <textarea
-                placeholder="Paste or type your notes..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={8}
-                className="input font-mono"
-              />
-            </>
-          )}
+                <textarea
+                  placeholder="Paste or type your notes..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={8}
+                  className="input font-mono"
+                />
+              </>
+            )}
 
-          {error && <Alert>{error}</Alert>}
-          {notice && <Alert kind="success">{notice}</Alert>}
+            {error && <Alert>{error}</Alert>}
+            {notice && <Alert kind="success">{notice}</Alert>}
 
-          <button type="submit" disabled={!canSubmit} className="btn-primary w-fit">
-            {isBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {isBusy ? progress ?? "Saving..." : mode === "files" ? "Upload" : "Save notes"}
-          </button>
-        </form>
+            <button type="submit" disabled={!canSubmit} className="btn-primary w-fit">
+              {isBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {isBusy ? progress ?? "Saving..." : mode === "files" ? "Upload" : "Save notes"}
+            </button>
+          </form>
+        )}
       </section>
 
       <h2 className="section-title">

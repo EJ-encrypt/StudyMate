@@ -82,3 +82,29 @@ class XpEvent(Base):
     # What earned it: "quiz", "game", "upload", "challenge".
     reason: Mapped[str] = mapped_column(String(30), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class UserBlock(Base):
+    """One student has blocked another: no friend requests or challenges either way."""
+
+    __tablename__ = "user_blocks"
+
+    blocker_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
+    blocked_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserReport(Base):
+    """A report about another student, read from the Supabase table editor."""
+
+    __tablename__ = "user_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reporter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    reported_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    # "username", "spam", "harassment" or "other".
+    reason: Mapped[str] = mapped_column(String(30), nullable=False)
+    details: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    # "open" until someone has looked at it.
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

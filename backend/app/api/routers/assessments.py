@@ -28,6 +28,7 @@ from app.schemas.assessment import (
     GradedAnswer,
     NewBadge,
 )
+from app.services import limits
 from app.services.ai import get_ai_provider
 from app.services.ai.base import ShortAnswerGrade, ShortAnswerSubmission
 from app.services.coaching import record_answers
@@ -95,6 +96,7 @@ def create_assessment(
         document_id = None
         source_label = f"{course.code} (cumulative)"
 
+    limits.spend(db, current_user.id, "generate")
     assessment = Assessment(
         student_id=current_user.id,
         course_id=course_id,
@@ -197,7 +199,10 @@ def submit_attempt(
     ]
 
     judged: dict[str, ShortAnswerGrade] = {}
-    if written:
+    # Over the daily limit the attempt is still recorded, only not AI-marked.
+    over_limit = bool(written) and not limits.allows(db, current_user.id, "grade", len(written))
+    if written and not over_limit:
+        limits.spend(db, current_user.id, "grade", len(written))
         try:
             judged = {grade.reference: grade for grade in get_ai_provider().grade_short_answers(written)}
         except Exception as exc:  # noqa: BLE001 -- the attempt is still worth recording
@@ -213,6 +218,8 @@ def submit_attempt(
             feedback = (
                 grade.feedback
                 if grade
+                else "You have used today's AI marking. Compare your answer with the model answer."
+                if over_limit
                 else "Automatic marking is unavailable right now. Compare your answer with the model answer."
             )
         else:

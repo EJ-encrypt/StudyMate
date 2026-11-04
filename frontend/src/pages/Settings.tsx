@@ -1,4 +1,5 @@
 import {
+  Ban,
   BellRing,
   Compass,
   KeyRound,
@@ -7,6 +8,7 @@ import {
   Save,
   Settings as SettingsIcon,
   Sun,
+  Target,
   Trash2,
   Trophy,
   UserRound,
@@ -16,12 +18,14 @@ import { useNavigate } from "react-router-dom";
 
 import { updatePreferences } from "../api/auth";
 import { errorMessage } from "../api/client";
-import { getProgrammes } from "../api/social";
+import { BlockedStudent, getProgrammes, listBlocked, unblockStudent } from "../api/social";
 import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
-import { Alert } from "../components/ui";
+import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { Captcha, captchaEnabled } from "../lib/captcha";
 import { getThemeChoice, setThemeChoice, ThemeChoice } from "../lib/theme";
+import { toast } from "../lib/toast";
 
 const LEVELS = [100, 200, 300, 400, 500, 600];
 const MIN_PASSWORD = 8;
@@ -191,12 +195,16 @@ function ProfileForm() {
 }
 
 function PasswordForm() {
-  const { changePassword } = useAuth();
+  const { changePassword, addPassword, hasPassword } = useAuth();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaRound, setCaptchaRound] = useState(0);
+  // Checking the current password is a sign-in, which CAPTCHA protection covers.
+  const needsCaptcha = hasPassword && captchaEnabled;
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -211,64 +219,172 @@ function PasswordForm() {
     }
     setIsSaving(true);
     try {
-      await changePassword(current, next);
+      if (hasPassword) {
+        await changePassword(current, next, captchaToken ?? undefined);
+        setMessage({ kind: "success", text: "Password changed." });
+      } else {
+        await addPassword(next);
+        setMessage({ kind: "success", text: "Password added. You can now log in with your email too." });
+      }
       setCurrent("");
       setNext("");
       setConfirm("");
-      setMessage({ kind: "success", text: "Password changed." });
     } catch (err) {
       setMessage({ kind: "error", text: err instanceof Error ? err.message : "Could not change your password." });
     } finally {
       setIsSaving(false);
+      if (needsCaptcha) setCaptchaRound((round) => round + 1);
     }
   }
 
   return (
-    <form onSubmit={save} className="card grid gap-3 p-4 sm:grid-cols-3">
-      <label>
-        <span className="label">Current password</span>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          value={current}
-          onChange={(e) => setCurrent(e.target.value)}
-          className="input mt-1"
-        />
-      </label>
+    <form onSubmit={save} className={`card grid gap-3 p-4 ${hasPassword ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+      {!hasPassword && (
+        <p className="text-sm text-ink/65 sm:col-span-2">
+          You signed up with Google, so this account has no password yet. Add one to also log in with your
+          email address.
+        </p>
+      )}
+      {hasPassword && (
+        <label>
+          <span className="label">Current password</span>
+          <PasswordInput
+            required
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            className="mt-1"
+          />
+        </label>
+      )}
       <label>
         <span className="label">New password</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="new-password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          className="input mt-1"
+          className="mt-1"
         />
       </label>
       <label>
         <span className="label">Confirm new password</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          className="input mt-1"
+          className="mt-1"
         />
       </label>
+      {needsCaptcha && (
+        <div className="sm:col-span-3">
+          <Captcha key={captchaRound} onToken={setCaptchaToken} />
+        </div>
+      )}
       {message && (
         <div className="sm:col-span-3">
           <Alert kind={message.kind}>{message.text}</Alert>
         </div>
       )}
       <div className="sm:col-span-3">
-        <button type="submit" disabled={isSaving} className="btn-primary">
-          <KeyRound className="h-4 w-4" aria-hidden /> {isSaving ? "Changing..." : "Change password"}
+        <button type="submit" disabled={isSaving || (needsCaptcha && !captchaToken)} className="btn-primary">
+          <KeyRound className="h-4 w-4" aria-hidden />{" "}
+          {hasPassword ? (isSaving ? "Changing..." : "Change password") : isSaving ? "Adding..." : "Add password"}
         </button>
       </div>
     </form>
+  );
+}
+
+const GOALS = [1, 2, 3, 4, 5, 6, 8, 10];
+
+function DailyGoal() {
+  const { user, refresh } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const goal = user?.daily_goal ?? 3;
+
+  async function choose(value: number) {
+    if (value === goal) return;
+    setIsSaving(true);
+    try {
+      await updatePreferences({ daily_goal: value });
+      await refresh();
+      toast(`Daily goal set to ${value} session${value === 1 ? "" : "s"}.`);
+    } catch (err) {
+      toast(errorMessage(err, "Could not save your goal."), { kind: "error" });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="card p-4">
+      <p className="text-sm text-ink/70">
+        Study sessions a day: each Arcade round or quiz counts as one, and every ten flashcards as one more. Your
+        progress shows on Profile.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Daily goal">
+        {GOALS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={goal === value}
+            disabled={isSaving}
+            onClick={() => void choose(value)}
+            className={[
+              "h-10 w-10 rounded-full text-sm font-bold transition",
+              goal === value ? "bg-navy text-gold" : "bg-ink/5 text-ink/70 hover:bg-ink/10",
+            ].join(" ")}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlockedStudents() {
+  const [blocked, setBlocked] = useState<BlockedStudent[] | null>(null);
+
+  useEffect(() => {
+    listBlocked()
+      .then(setBlocked)
+      .catch(() => setBlocked([]));
+  }, []);
+
+  async function unblock(student: BlockedStudent) {
+    try {
+      await unblockStudent(student.id);
+      setBlocked((current) => current?.filter((s) => s.id !== student.id) ?? null);
+      toast(`${student.name} is unblocked.`);
+    } catch (err) {
+      toast(errorMessage(err, "Could not unblock them."), { kind: "error" });
+    }
+  }
+
+  if (blocked === null) return null;
+  return (
+    <div className="card p-4">
+      {blocked.length === 0 ? (
+        <p className="text-sm text-ink/60">
+          Nobody. Block someone from the ... menu beside them on the Leaderboard; they are not told.
+        </p>
+      ) : (
+        <ul className="divide-y divide-ink/5">
+          {blocked.map((student) => (
+            <li key={student.id} className="flex items-center justify-between gap-3 py-2">
+              <span className="truncate text-sm text-ink">{student.name}</span>
+              <button type="button" onClick={() => void unblock(student)} className="btn-ghost text-xs">
+                Unblock
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -421,8 +537,14 @@ export default function Settings() {
       <Section icon={UserRound} title="Your details">
         <ProfileForm />
       </Section>
+      <Section icon={Target} title="Daily goal">
+        <DailyGoal />
+      </Section>
       <Section icon={Trophy} title="Leaderboards">
         <LeaderboardSetting />
+      </Section>
+      <Section icon={Ban} title="Blocked students">
+        <BlockedStudents />
       </Section>
       <Section icon={BellRing} title="Lecture reminders">
         <NotificationSettings />

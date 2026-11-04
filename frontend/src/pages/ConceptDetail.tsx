@@ -11,7 +11,7 @@ import {
 import { ConceptDetail as ConceptDetailData, STATUS_LABELS, STATUS_STYLES, getConceptDetail } from "../api/coach";
 import PageHeader from "../components/PageHeader";
 import MathText from "../components/MathText";
-import { Alert, Spinner, StatTile } from "../components/ui";
+import { Alert, ListSkeleton, StatTile } from "../components/ui";
 
 const PRACTICE_KINDS: AssessmentKind[] = ["flashcard", "mcq", "short_answer"];
 
@@ -56,7 +56,7 @@ export default function ConceptDetail() {
     return <Alert>{error}</Alert>;
   }
   if (!concept) {
-    return <Spinner />;
+    return <ListSkeleton rows={2} />;
   }
 
   const percent = concept.score === null ? null : Math.round(concept.score * 100);

@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import AuthLayout from "../components/AuthLayout";
-import { Alert } from "../components/ui";
+import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
 /** Where the emailed reset link lands; Supabase has already signed the student in. */
@@ -37,14 +37,13 @@ export default function ResetPassword() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label>
           <span className="label">New password</span>
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="input mt-1"
+            className="mt-1"
           />
         </label>
         {error && <Alert>{error}</Alert>}

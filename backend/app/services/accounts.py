@@ -22,7 +22,9 @@ from app.models.gamification import EarnedBadge, StudentProgress
 from app.models.job import Job
 from app.models.mastery import ConceptMastery
 from app.models.schedule import LectureSlot, PushSubscription, SentReminder
-from app.models.social import Challenge, Friendship, GameRound, XpEvent
+from app.models.review import FlashcardReview
+from app.models.social import Challenge, Friendship, GameRound, UserBlock, UserReport, XpEvent
+from app.models.usage import AiUsage
 from app.models.user import User
 from app.services.storage import get_storage
 
@@ -43,6 +45,7 @@ def delete_account(db: Session, user: User) -> None:
     def gone(query) -> None:
         query.delete(synchronize_session=False)
 
+    gone(db.query(FlashcardReview).filter(FlashcardReview.student_id == student_id))
     gone(db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id.in_(attempts.scalar_subquery())))
     gone(db.query(Attempt).filter(Attempt.student_id == student_id))
     gone(db.query(AssessmentItem).filter(AssessmentItem.assessment_id.in_(assessments.scalar_subquery())))
@@ -59,6 +62,11 @@ def delete_account(db: Session, user: User) -> None:
     gone(db.query(Friendship).filter(
         (Friendship.requester_id == student_id) | (Friendship.addressee_id == student_id)
     ))
+    gone(db.query(UserBlock).filter((UserBlock.blocker_id == student_id) | (UserBlock.blocked_id == student_id)))
+    gone(db.query(UserReport).filter(
+        (UserReport.reporter_id == student_id) | (UserReport.reported_id == student_id)
+    ))
+    gone(db.query(AiUsage).filter(AiUsage.student_id == student_id))
     gone(db.query(XpEvent).filter(XpEvent.student_id == student_id))
     gone(db.query(EarnedBadge).filter(EarnedBadge.student_id == student_id))
     gone(db.query(StudentProgress).filter(StudentProgress.student_id == student_id))

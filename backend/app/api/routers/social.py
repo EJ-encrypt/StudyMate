@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
@@ -10,17 +10,19 @@ from app.api.deps import get_current_user
 from app.api.routers.games import _answers, round_view
 from app.db.session import get_db
 from app.models.course import Course
-from app.models.social import Challenge, Friendship, GameRound
+from app.models.social import Challenge, Friendship, GameRound, UserBlock, UserReport
 from app.models.user import User
 from app.schemas.assessment import NewBadge
 from app.schemas.game import AnswerResult, ChallengeInfo, GameResult, RoundRead, RoundSubmit
 from app.schemas.social import (
+    BlockedRead,
     ChallengeCreate,
     ChallengeRead,
     FriendRead,
     FriendRequestCreate,
     FriendsOverview,
     LeaderboardRead,
+    ReportCreate,
     StandingRead,
 )
 from app.services import arcade, social
@@ -86,7 +88,8 @@ def send_request(
 ) -> dict:
     username = payload.username.strip().lstrip("@").lower()
     other = db.query(User).filter(User.username == username).first() if username else None
-    if other is None:
+    # A block looks the same as a username that does not exist.
+    if other is None or social.is_blocked(db, me.id, other.id):
         raise HTTPException(status_code=404, detail="Nobody has that username. Check the spelling with your friend.")
     if other.id == me.id:
         raise HTTPException(status_code=400, detail="That is your own username.")
@@ -148,6 +151,66 @@ def remove_friend(user_id: uuid.UUID, db: Session = Depends(get_db), me: User = 
         raise HTTPException(status_code=404, detail="Not found")
     db.delete(row)
     db.commit()
+
+
+# --- Blocking and reporting -------------------------------------------------
+
+REPORTS_PER_DAY = 10
+
+
+@router.get("/blocks", response_model=list[BlockedRead])
+def list_blocks(db: Session = Depends(get_db), me: User = Depends(get_current_user)) -> list[BlockedRead]:
+    rows = db.query(UserBlock).filter(UserBlock.blocker_id == me.id).order_by(UserBlock.created_at.desc()).all()
+    users = {u.id: u for u in db.query(User).filter(User.id.in_([r.blocked_id for r in rows]))} if rows else {}
+    return [
+        BlockedRead(id=user.id, name=social.public_name(user), username=user.username)
+        for row in rows
+        if (user := users.get(row.blocked_id)) is not None
+    ]
+
+
+def _other_student(db: Session, user_id: uuid.UUID, me: User) -> User:
+    other = db.get(User, user_id)
+    if other is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if other.id == me.id:
+        raise HTTPException(status_code=400, detail="That is you.")
+    return other
+
+
+@router.post("/users/{user_id}/block", status_code=status.HTTP_204_NO_CONTENT)
+def block_student(user_id: uuid.UUID, db: Session = Depends(get_db), me: User = Depends(get_current_user)) -> None:
+    """They can no longer find you, send requests or challenge you. They are not told."""
+    social.block(db, me.id, _other_student(db, user_id, me).id)
+    db.commit()
+
+
+@router.delete("/users/{user_id}/block", status_code=status.HTTP_204_NO_CONTENT)
+def unblock_student(user_id: uuid.UUID, db: Session = Depends(get_db), me: User = Depends(get_current_user)) -> None:
+    row = db.get(UserBlock, (me.id, user_id))
+    if row is not None:
+        db.delete(row)
+        db.commit()
+
+
+@router.post("/users/{user_id}/report", status_code=status.HTTP_201_CREATED)
+def report_student(
+    user_id: uuid.UUID,
+    payload: ReportCreate,
+    db: Session = Depends(get_db),
+    me: User = Depends(get_current_user),
+) -> dict:
+    other = _other_student(db, user_id, me)
+    since = datetime.now(timezone.utc) - timedelta(days=1)
+    recent = db.query(UserReport).filter(UserReport.reporter_id == me.id, UserReport.created_at >= since).count()
+    if recent >= REPORTS_PER_DAY:
+        raise HTTPException(status_code=429, detail="You have sent a lot of reports today. Please try again tomorrow.")
+    db.add(UserReport(reporter_id=me.id, reported_id=other.id, reason=payload.reason, details=payload.details.strip()))
+    if payload.block:
+        social.block(db, me.id, other.id)
+    db.commit()
+    logger.warning("Student %s reported %s (%s)", me.id, other.id, payload.reason)
+    return {"status": "received", "blocked": payload.block}
 
 
 # --- Leaderboards -------------------------------------------------------------

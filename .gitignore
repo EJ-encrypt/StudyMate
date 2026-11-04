@@ -30,3 +30,6 @@ postgres-data/
 
 ## Uploaded lecture files (local dev storage)
 /backend/storage/
+
+# Database backups (scripts/backup.py): everyone's data, never committed.
+backups/

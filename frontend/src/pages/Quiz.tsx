@@ -11,7 +11,7 @@ import {
 } from "../api/assessments";
 import FlashcardDeck from "../components/FlashcardDeck";
 import MathText from "../components/MathText";
-import { Alert, NewBadges, Spinner } from "../components/ui";
+import { Alert, ListSkeleton, NewBadges } from "../components/ui";
 
 export default function Quiz() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
@@ -52,7 +52,7 @@ export default function Quiz() {
     return <Alert>{error}</Alert>;
   }
   if (!assessment) {
-    return <Spinner />;
+    return <ListSkeleton rows={3} />;
   }
 
   const graded = result ? Object.fromEntries(result.answers.map((a) => [a.item_id, a])) : {};

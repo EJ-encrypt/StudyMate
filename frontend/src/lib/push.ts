@@ -18,7 +18,8 @@ export function isIos(): boolean {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
-function isStandalone(): boolean {
+/** Running as an installed app from the home screen, not in a browser tab. */
+export function isStandalone(): boolean {
   return (
     window.matchMedia?.("(display-mode: standalone)").matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true

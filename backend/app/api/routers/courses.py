@@ -18,6 +18,7 @@ from app.schemas.course import (
     CourseProposal,
     CourseRead,
 )
+from app.services import limits
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ async def read_course_list(
     from app.services.uploads import read_upload
 
     data, mime_type, extra_text = await read_upload(file, "your course list")
+    limits.spend(db, current_user.id, "read")
+    db.commit()
     try:
         entries = get_ai_provider().read_course_list(data, mime_type, extra_text)
     except Exception as exc:  # noqa: BLE001 -- reported to the student

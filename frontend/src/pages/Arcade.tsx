@@ -29,7 +29,7 @@ import { CourseGameStats, GAME_PATHS, GameName, getGameStats } from "../api/game
 import { listChallenges } from "../api/social";
 import CourseSelect from "../components/CourseSelect";
 import PageHeader from "../components/PageHeader";
-import { Spinner } from "../components/ui";
+import { ListSkeleton } from "../components/ui";
 
 interface GameInfo {
   game: GameName;
@@ -192,7 +192,7 @@ export default function Arcade() {
         <CourseSelect selectedCourseId={courseId} onSelect={setCourseId} allowCreate={false} />
       </div>
 
-      {courseId && !stats && <Spinner />}
+      {courseId && !stats && <ListSkeleton grid rows={3} />}
 
       {stats && (
         <div className="grid gap-4 md:grid-cols-2">

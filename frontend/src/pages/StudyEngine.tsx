@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Course, groupByLevelAndSemester, listCourses } from "../api/courses";
 import CourseCard from "../components/CourseCard";
 import PageHeader from "../components/PageHeader";
-import { Alert, EmptyState, Spinner } from "../components/ui";
+import { Alert, EmptyState, ListSkeleton } from "../components/ui";
 
 export default function StudyEngine() {
   const [courses, setCourses] = useState<Course[] | null>(null);
@@ -36,7 +36,7 @@ export default function StudyEngine() {
           <Alert>{error}</Alert>
         </div>
       )}
-      {courses === null && <Spinner />}
+      {courses === null && <ListSkeleton grid rows={3} />}
 
       {courses?.length === 0 && (
         <EmptyState

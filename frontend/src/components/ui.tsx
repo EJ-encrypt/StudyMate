@@ -1,5 +1,5 @@
-import { AlertCircle, Award, CheckCircle2, Loader2, LucideIcon } from "lucide-react";
-import { ReactNode } from "react";
+import { AlertCircle, Award, CheckCircle2, Eye, EyeOff, Loader2, LucideIcon } from "lucide-react";
+import { InputHTMLAttributes, ReactNode, useState } from "react";
 
 import { NewBadge } from "../api/assessments";
 
@@ -141,4 +141,45 @@ export function StatusPill({ tone, children }: { tone: "green" | "gold" | "red" 
     blue: "bg-sky-100 text-sky-800",
   }[tone];
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${styles}`}>{children}</span>;
+}
+
+/** A password field with the usual eye button to show what has been typed. */
+export function PasswordInput({ className = "", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [isVisible, setIsVisible] = useState(false);
+  return (
+    <div className={`relative ${className}`}>
+      <input {...props} type={isVisible ? "text" : "password"} className="input pr-11" />
+      <button
+        type="button"
+        onClick={() => setIsVisible((visible) => !visible)}
+        aria-label={isVisible ? "Hide password" : "Show password"}
+        aria-pressed={isVisible}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-ink/50 hover:text-ink"
+      >
+        {isVisible ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+      </button>
+    </div>
+  );
+}
+
+/** A grey placeholder in the shape of what is loading, which feels faster than a spinner. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-ink/10 ${className}`} aria-hidden />;
+}
+
+/** Placeholder rows for a list or a grid of cards while it loads. */
+export function ListSkeleton({ rows = 3, grid = false }: { rows?: number; grid?: boolean }) {
+  return (
+    <div role="status" aria-label="Loading" className={grid ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3" : "space-y-3"}>
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="card flex items-center gap-3 p-4">
+          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

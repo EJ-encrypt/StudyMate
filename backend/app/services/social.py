@@ -6,6 +6,8 @@ Privacy rules, deliberately simple:
   there is none), never email addresses.
 - Someone can only be found by their exact username, so the app cannot be
   used to browse who else is on it.
+- A block works both ways and is never revealed: to the blocked student the
+  blocker looks like a username that does not exist.
 """
 
 import re
@@ -17,7 +19,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.gamification import StudentProgress
-from app.models.social import Challenge, Friendship, XpEvent
+from app.models.social import Challenge, Friendship, UserBlock, XpEvent
 from app.models.user import User
 
 CHALLENGE_HOURS = 48
@@ -89,6 +91,40 @@ def are_friends(db: Session, a: uuid.UUID, b: uuid.UUID) -> bool:
     return row is not None and row.status == "accepted"
 
 
+def blocked_ids(db: Session, student_id: uuid.UUID) -> set[uuid.UUID]:
+    """Everyone the student blocked or was blocked by."""
+    rows = db.query(UserBlock).filter(or_(UserBlock.blocker_id == student_id, UserBlock.blocked_id == student_id))
+    return {row.blocked_id if row.blocker_id == student_id else row.blocker_id for row in rows}
+
+
+def is_blocked(db: Session, a: uuid.UUID, b: uuid.UUID) -> bool:
+    return (
+        db.query(UserBlock)
+        .filter(
+            or_(
+                (UserBlock.blocker_id == a) & (UserBlock.blocked_id == b),
+                (UserBlock.blocker_id == b) & (UserBlock.blocked_id == a),
+            )
+        )
+        .first()
+        is not None
+    )
+
+
+def block(db: Session, blocker_id: uuid.UUID, blocked_id: uuid.UUID) -> None:
+    """Block, ending any friendship or request and calling off open challenges between them."""
+    if db.get(UserBlock, (blocker_id, blocked_id)) is None:
+        db.add(UserBlock(blocker_id=blocker_id, blocked_id=blocked_id))
+    db.query(Friendship).filter(_between(blocker_id, blocked_id)).delete(synchronize_session=False)
+    db.query(Challenge).filter(
+        Challenge.status == "open",
+        or_(
+            (Challenge.challenger_id == blocker_id) & (Challenge.opponent_id == blocked_id),
+            (Challenge.challenger_id == blocked_id) & (Challenge.opponent_id == blocker_id),
+        ),
+    ).update({Challenge.status: "expired"}, synchronize_session=False)
+
+
 # --- Leaderboards -------------------------------------------------------------
 
 
@@ -135,10 +171,11 @@ def leaderboard(db: Session, me: User, scope: str, period: str) -> list[Standing
         key = programme_key(me.programme)
         if not key:
             return []
+        hidden = blocked_ids(db, me.id)
         users = [
             user
             for user in db.query(User).filter(User.public_leaderboard.is_(True)).all()
-            if programme_key(user.programme) == key
+            if programme_key(user.programme) == key and user.id not in hidden
         ]
         show_real_names = False
 

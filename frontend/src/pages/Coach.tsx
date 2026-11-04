@@ -1,4 +1,4 @@
-import { BookOpenCheck, Lightbulb, ListTree } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Layers, Lightbulb, ListTree } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import {
   STATUS_LABELS,
   STATUS_STYLES,
 } from "../api/coach";
+import { getDueByCourse } from "../api/review";
 import CourseSelect from "../components/CourseSelect";
 import MathText from "../components/MathText";
 import PageHeader from "../components/PageHeader";
@@ -40,6 +41,14 @@ export default function Coach() {
   const [courseId, setCourseId] = useState<string | null>(null);
   const [summary, setSummary] = useState<CoachSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dueCards, setDueCards] = useState(0);
+
+  useEffect(() => {
+    if (!courseId) return;
+    getDueByCourse()
+      .then((courses) => setDueCards(courses.find((c) => c.course_id === courseId)?.due ?? 0))
+      .catch(() => setDueCards(0));
+  }, [courseId]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -77,6 +86,24 @@ export default function Coach() {
         >
           Once your material is processed, the Coach tracks how well you know every topic in it.
         </EmptyState>
+      )}
+
+      {dueCards > 0 && courseId && (
+        <Link
+          to={`/review/${courseId}`}
+          className="mb-4 flex items-center gap-3 rounded-xl border border-gold/50 bg-gold/10 p-4 transition hover:bg-gold/15"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/25 text-gold-dark">
+            <Layers className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-ink">
+              {dueCards} flashcard{dueCards === 1 ? "" : "s"} due for review
+            </span>
+            <span className="block text-sm text-ink/60">A few minutes now keeps them from slipping.</span>
+          </span>
+          <ArrowRight className="h-5 w-5 shrink-0 text-gold-dark" aria-hidden />
+        </Link>
       )}
 
       {summary && summary.concept_count > 0 && (

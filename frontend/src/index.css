@@ -104,6 +104,16 @@
 .dark .text-violet-700 { color: rgb(196 181 253); }
 .dark .text-sky-700 { color: rgb(125 211 252); }
 
+/* iPhones zoom into any field whose text is under 16px when it is tapped, and
+   the page then has to be dragged sideways to see what is being typed. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Leaves room for the phone's home indicator under the bottom tab bar. */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
@@ -144,4 +154,26 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.25rem 0;
+}
+
+/* Accessibility. The faintest grey text (hints, captions) was under the 4.5:1
+   contrast that small text needs in both themes, so it is lifted to the
+   lightest shade that still passes. Placeholders keep their lighter grey. */
+.text-ink\/40,
+.text-ink\/45,
+.text-ink\/50 {
+  color: rgb(var(--ink) / 0.64);
+}
+
+/* People who set "reduce motion" on their phone get no card flips, shakes or
+   sliding: everything changes instantly instead. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

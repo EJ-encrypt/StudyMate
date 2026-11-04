@@ -3,7 +3,7 @@
  * on the account: someone may well want dark on their phone at night and
  * light on a lab computer.
  *
- * index.html applies the saved choice before the page draws, so a dark-mode
+ * public/theme-init.js applies the saved choice before the page draws, so a dark-mode
  * user never sees a white flash; this module keeps it in sync afterwards.
  */
 

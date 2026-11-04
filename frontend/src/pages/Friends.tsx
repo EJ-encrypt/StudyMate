@@ -20,8 +20,10 @@ import {
   sendFriendRequest,
 } from "../api/social";
 import PageHeader from "../components/PageHeader";
-import { Alert, EmptyState, Spinner } from "../components/ui";
+import StudentActions from "../components/StudentActions";
+import { Alert, EmptyState, ListSkeleton } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { undoable } from "../lib/toast";
 
 type Tab = "leaderboard" | "friends" | "challenges";
 
@@ -121,7 +123,7 @@ function LeaderboardTab() {
       </div>
 
       {error && <Alert>{error}</Alert>}
-      {!board && !error && <Spinner />}
+      {!board && !error && <ListSkeleton rows={4} />}
 
       {board && scope === "programme" && (
         <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 p-4">
@@ -165,6 +167,7 @@ function LeaderboardTab() {
                 )}
               </div>
               <span className="text-sm font-bold tabular-nums text-ink">{standing.xp.toLocaleString()} XP</span>
+              {!standing.is_me && <StudentActions studentId={standing.student_id} name={standing.name} onChanged={load} />}
             </li>
           ))}
         </ol>
@@ -178,6 +181,8 @@ function FriendsTab() {
   const [overview, setOverview] = useState<FriendsOverview | null>(null);
   const [username, setUsername] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  // Friends just removed, hidden while their Undo is on screen.
+  const [leaving, setLeaving] = useState<string[]>([]);
 
   const load = useCallback(() => {
     getFriends()
@@ -250,7 +255,7 @@ function FriendsTab() {
         )}
       </form>
 
-      {!overview && <Spinner />}
+      {!overview && <ListSkeleton rows={4} />}
 
       {overview && overview.incoming.length > 0 && (
         <section className="mb-4">
@@ -276,6 +281,7 @@ function FriendsTab() {
                 >
                   <X className="h-4 w-4" aria-hidden />
                 </button>
+                <StudentActions studentId={other.id} name={other.full_name} onChanged={load} />
               </li>
             ))}
           </ul>
@@ -284,14 +290,14 @@ function FriendsTab() {
 
       {overview && (
         <section className="mb-4">
-          <h2 className="section-title">Friends · {overview.friends.length}</h2>
-          {overview.friends.length === 0 ? (
+          <h2 className="section-title">Friends · {overview.friends.length - leaving.length}</h2>
+          {overview.friends.length - leaving.length === 0 ? (
             <EmptyState icon={Users} title="No friends yet">
               Add classmates by their username to compare progress and challenge them in the Arcade.
             </EmptyState>
           ) : (
             <ul className="card divide-y divide-ink/5">
-              {overview.friends.map((friend) => (
+              {overview.friends.filter((friend) => !leaving.includes(friend.id)).map((friend) => (
                 <li key={friend.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink">{friend.full_name}</p>
@@ -303,14 +309,24 @@ function FriendsTab() {
                   <span className="text-xs font-semibold text-ink/60">{friend.xp.toLocaleString()} XP</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm(`Remove ${friend.full_name} from your friends?`)) void act(() => removeFriend(friend.id));
-                    }}
+                    onClick={() =>
+                      undoable({
+                        text: `${friend.full_name} removed from your friends.`,
+                        hide: () => setLeaving((ids) => [...ids, friend.id]),
+                        restore: () => setLeaving((ids) => ids.filter((id) => id !== friend.id)),
+                        commit: async () => {
+                          await removeFriend(friend.id);
+                          setLeaving((ids) => ids.filter((id) => id !== friend.id));
+                          load();
+                        },
+                      })
+                    }
                     aria-label={`Remove ${friend.full_name}`}
                     className="btn-ghost p-1.5 text-ink/40"
                   >
                     <UserMinus className="h-4 w-4" aria-hidden />
                   </button>
+                  <StudentActions studentId={friend.id} name={friend.full_name} onChanged={load} />
                 </li>
               ))}
             </ul>
@@ -353,7 +369,7 @@ function ChallengesTab() {
       .catch(() => setChallenges([]));
   }, []);
 
-  if (!challenges) return <Spinner />;
+  if (!challenges) return <ListSkeleton rows={4} />;
   if (challenges.length === 0) {
     return (
       <EmptyState

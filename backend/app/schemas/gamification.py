@@ -20,3 +20,6 @@ class ProgressSummary(BaseModel):
     documents: int
     attempts: int
     badges: list[BadgeRead]
+    # Study sessions wanted per day, and how many are done so far today.
+    daily_goal: int = 3
+    done_today: int = 0

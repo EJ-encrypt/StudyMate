@@ -18,6 +18,8 @@ export interface UserProfile {
   tutorial_seen: boolean;
   /** Opted into the programme leaderboard. */
   public_leaderboard: boolean;
+  /** Study sessions a day that count as a good day. */
+  daily_goal: number;
 }
 
 export interface OnboardingDetails {
@@ -36,6 +38,7 @@ export interface Preferences {
   semester?: number;
   tutorial_seen?: boolean;
   public_leaderboard?: boolean;
+  daily_goal?: number;
   programme?: string;
   timezone?: string;
   notify_push?: boolean;

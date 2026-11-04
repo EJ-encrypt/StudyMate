@@ -254,6 +254,9 @@ def transcription_prompt() -> str:
         "Transcribe this lecture material into plain text so it can be studied from. "
         "Keep every heading, definition, worked example, formula and step. Write all "
         "mathematics in LaTeX: $...$ inline and $$...$$ for displayed equations. "
-        "Describe a graph or diagram in one sentence in square brackets. Do not add "
+        "Describe a graph or diagram in one sentence in square brackets. It may be "
+        "photos of handwritten notes from an exercise book: read the handwriting, "
+        "ignore ruled lines, margins and crossed-out words, and keep the pages in "
+        "order. Write [unclear] for a word that cannot be read. Do not add "
         "commentary, summaries or anything that is not in the material."
     )

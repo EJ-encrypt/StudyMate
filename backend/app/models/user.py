@@ -53,6 +53,9 @@ class User(Base):
     # Opt-in: appear on the leaderboard for everyone on the same programme,
     # under the username. Friends always see each other regardless.
     public_leaderboard: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # How many study sessions (Arcade rounds, quizzes, flashcard reviews) make a
+    # good day, shown as a ring on Profile. Chosen in Settings.
+    daily_goal: Mapped[int] = mapped_column(Integer, nullable=False, default=3, server_default="3")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")

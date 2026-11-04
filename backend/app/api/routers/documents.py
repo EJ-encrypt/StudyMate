@@ -19,6 +19,7 @@ from app.schemas.document import (
     UploadRequest,
     UploadTargetRead,
 )
+from app.services import limits
 from app.services.extraction import SUPPORTED_EXTENSIONS
 from app.services.storage import LocalStorage, get_storage
 from app.workers.jobs import PROCESS_DOCUMENT, enqueue
@@ -71,6 +72,7 @@ def _validated_name(filename: str) -> str:
 def _register(
     db: Session, current_user: User, course_id: uuid.UUID, document_id: uuid.UUID, safe_name: str
 ) -> LectureDocument:
+    limits.spend(db, current_user.id, "document")
     document = LectureDocument(
         id=document_id,
         student_id=current_user.id,
@@ -96,6 +98,8 @@ def request_uploads(
     middle of a selection does not leave the earlier ones half-uploaded.
     """
     _require_own_course(db, payload.course_id, current_user)
+    # Checked before anything is uploaded; counted when the uploads complete.
+    limits.check(db, current_user.id, "document", len(payload.files))
 
     prepared: list[tuple[str, str]] = []
     for spec in payload.files:

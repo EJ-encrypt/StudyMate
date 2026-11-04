@@ -6,7 +6,7 @@ import { errorMessage } from "../api/client";
 import { Course, listCourses } from "../api/courses";
 import { DAYS, LectureSlot, ReflectionResult, addReflection, getSlot, hhmm } from "../api/schedule";
 import { runMyJobs } from "../api/jobs";
-import { Alert, NewBadges, Spinner } from "../components/ui";
+import { Alert, ListSkeleton, NewBadges } from "../components/ui";
 
 const PROMPTS = [
   "What was the main idea of today's lecture?",
@@ -52,7 +52,7 @@ export default function Reflect() {
   }
 
   if (error && !slot) return <Alert>{error}</Alert>;
-  if (!slot) return <Spinner />;
+  if (!slot) return <ListSkeleton rows={1} />;
 
   if (result) {
     return (

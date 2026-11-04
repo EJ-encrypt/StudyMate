@@ -24,6 +24,23 @@ class FriendsOverview(BaseModel):
     outgoing: list[FriendRequestRead]
 
 
+REPORT_REASONS = ("username", "spam", "harassment", "other")
+
+
+class ReportCreate(BaseModel):
+    # One of REPORT_REASONS.
+    reason: str = Field(pattern="^(username|spam|harassment|other)$")
+    details: str = Field(default="", max_length=1000)
+    # Report and block in one step, as most apps offer.
+    block: bool = True
+
+
+class BlockedRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    username: str | None
+
+
 class FriendRequestCreate(BaseModel):
     username: str = Field(min_length=1, max_length=31)
 

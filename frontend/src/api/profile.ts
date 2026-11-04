@@ -16,6 +16,9 @@ export interface ProgressSummary {
   documents: number;
   attempts: number;
   badges: Badge[];
+  /** Study sessions wanted per day, and how many are done so far today. */
+  daily_goal: number;
+  done_today: number;
 }
 
 export async function getProgress(): Promise<ProgressSummary> {

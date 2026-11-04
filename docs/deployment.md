@@ -253,7 +253,65 @@ It applies any new database migrations to Supabase first, then uploads the
 committed code to Vercel, waits for the build, and checks the site answers.
 It needs `DATABASE_URL` (session pooler) and `VERCEL_TOKEN` in `.env`, and
 deploys only what is committed. If the database step fails, nothing is
-deployed.
+deployed. It also copies `SENTRY_DSN`, `VITE_SENTRY_DSN` and
+`VITE_TURNSTILE_SITE_KEY` from `.env` to Vercel when they are set.
+
+## Sign-in settings, Google sign-in and CAPTCHA
+
+`scripts/configure_auth.py` applies the sign-in settings to Supabase:
+passwords of at least 8 characters, and the app's address as an allowed
+return address. It needs `SUPABASE_ACCESS_TOKEN` in `.env`.
+
+```bash
+backend\.venv\Scripts\python scripts\configure_auth.py
+```
+
+**Google sign-in** (free):
+
+1. In [Google Cloud Console](https://console.cloud.google.com), create a
+   project, then **APIs & Services → OAuth consent screen**: External, app
+   name StudyMate, your email as support and developer contact. Publish it.
+2. **Credentials → Create credentials → OAuth client ID → Web application**.
+   - Authorised JavaScript origins: `https://studymate-alpha-fawn.vercel.app`
+   - Authorised redirect URIs: `https://<project-ref>.supabase.co/auth/v1/callback`
+3. Put the client ID and secret in `.env` as `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET`, then run `configure_auth.py`. The "Continue with
+   Google" button appears by itself once Google is on in Supabase.
+
+**CAPTCHA** (Cloudflare Turnstile, free): create a widget at
+dash.cloudflare.com → Turnstile for the app's domain. Put the site key in
+`.env` as `VITE_TURNSTILE_SITE_KEY` and the secret as `TURNSTILE_SECRET_KEY`,
+run `configure_auth.py`, then release. Do the two together: with CAPTCHA on
+in Supabase but no site key in the page, nobody can sign in.
+
+## Error reports (Sentry)
+
+Create a free project at sentry.io (platform: React for the page, FastAPI for
+the API; one project can take both). Put its DSN in `.env` as both
+`SENTRY_DSN` and `VITE_SENTRY_DSN`, then release. Reports carry no email
+addresses or uploaded content.
+
+## Backups
+
+Supabase's free plan keeps no backups you can restore yourself. Save one to
+this computer every week or so, and before any big change:
+
+```bash
+backend\.venv\Scripts\python scripts\backup.py           # the database
+backend\.venv\Scripts\python scripts\backup.py --files   # and the lecture files
+```
+
+Backups go to `backups/` (never committed: it holds everyone's data).
+`scripts/restore.py` loads one into a new, empty database; its first lines
+say how.
+
+## Keeping the project awake
+
+Supabase pauses a free project after about a week with no activity. The
+**Keep alive** workflow in `.github/workflows` asks the API to touch the
+database every morning. It runs on GitHub by itself once the repository is
+pushed; check it under the repository's **Actions** tab. The **Tests**
+workflow there runs every test on each push.
 
 ## Running locally (optional)
 

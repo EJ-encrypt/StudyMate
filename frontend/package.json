@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/browser": "^11.10.0",
     "@supabase/supabase-js": "^2.118.0",
     "axios": "^1.7.7",
     "katex": "^0.16.47",

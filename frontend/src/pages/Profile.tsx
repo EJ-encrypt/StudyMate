@@ -25,8 +25,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { getProgress, ProgressSummary } from "../api/profile";
+import DailyGoalRing from "../components/DailyGoalRing";
 import PageHeader from "../components/PageHeader";
-import { Alert, Spinner, StatTile } from "../components/ui";
+import { Alert, ListSkeleton, StatTile } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
 const BADGE_ICONS: Record<string, LucideIcon> = {
@@ -79,10 +80,11 @@ export default function Profile() {
       />
 
       {error && <Alert>{error}</Alert>}
-      {!progress && !error && <Spinner />}
+      {!progress && !error && <ListSkeleton rows={2} />}
 
       {progress && (
         <>
+          <DailyGoalRing done={progress.done_today} goal={progress.daily_goal} />
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile icon={Zap} tone="amber" label="XP" value={progress.xp.toLocaleString()} />
             <StatTile icon={Flame} tone="fire" label="Day streak" value={progress.current_streak} />

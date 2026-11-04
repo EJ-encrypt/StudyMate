@@ -33,6 +33,7 @@ class UserRead(BaseModel):
     notify_email: bool = True
     tutorial_seen: bool = False
     public_leaderboard: bool = False
+    daily_goal: int = 3
 
     @property
     def needs_onboarding(self) -> bool:
@@ -67,6 +68,7 @@ class PreferencesUpdate(BaseModel):
     notify_email: bool | None = None
     tutorial_seen: bool | None = None
     public_leaderboard: bool | None = None
+    daily_goal: int | None = Field(default=None, ge=1, le=20)
     programme: str | None = Field(default=None, min_length=1, max_length=150)
 
     @field_validator("username")

@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
-import { Spinner } from "./ui";
+import { ListSkeleton } from "./ui";
 
 export default function ProtectedRoute() {
   const { user, isLoading } = useAuth();
@@ -9,8 +9,8 @@ export default function ProtectedRoute() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-8">
-        <Spinner />
+      <div className="mx-auto max-w-3xl p-4 sm:p-8">
+        <ListSkeleton rows={3} />
       </div>
     );
   }

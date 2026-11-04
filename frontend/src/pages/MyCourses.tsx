@@ -5,7 +5,7 @@ import { Course, createCourse, groupByLevelAndSemester, listCourses } from "../a
 import CourseCard from "../components/CourseCard";
 import CourseImport from "../components/CourseImport";
 import PageHeader from "../components/PageHeader";
-import { Alert, EmptyState, Spinner } from "../components/ui";
+import { Alert, EmptyState, ListSkeleton } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 
 const LEVELS = [100, 200, 300, 400, 500, 600];
@@ -142,7 +142,7 @@ export default function MyCourses() {
         </div>
       )}
 
-      {courses === null && <Spinner />}
+      {courses === null && <ListSkeleton grid rows={3} />}
 
       {courses?.length === 0 && !isAdding && !isImporting && (
         <EmptyState

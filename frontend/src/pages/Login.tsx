@@ -3,8 +3,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import AuthLayout from "../components/AuthLayout";
-import { Alert } from "../components/ui";
+import GoogleSignIn from "../components/GoogleSignIn";
+import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { Captcha, captchaEnabled } from "../lib/captcha";
 
 function friendly(message: string): string {
   if (/email not confirmed/i.test(message)) {
@@ -24,6 +26,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // A captcha token works once, so the check is redone after every attempt.
+  const [captchaRound, setCaptchaRound] = useState(0);
+  const isWaitingForCaptcha = captchaEnabled && !captchaToken;
 
   useEffect(() => {
     if (user) navigate(from, { replace: true });
@@ -35,9 +41,10 @@ export default function Login() {
     setNotice(null);
     setIsSubmitting(true);
     try {
-      await login(email, password);
+      await login(email, password, captchaToken ?? undefined);
     } catch (err) {
       setError(friendly((err as Error).message));
+      setCaptchaRound((round) => round + 1);
     } finally {
       setIsSubmitting(false);
     }
@@ -49,16 +56,23 @@ export default function Login() {
       setError("Type your email above first, then choose Forgot password.");
       return;
     }
+    if (isWaitingForCaptcha) {
+      setError("Complete the check below first, then choose Forgot password.");
+      return;
+    }
     try {
-      await sendPasswordReset(email);
+      await sendPasswordReset(email, captchaToken ?? undefined);
       setNotice(`If ${email} has an account, a reset link is on its way.`);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setCaptchaRound((round) => round + 1);
     }
   }
 
   return (
     <AuthLayout title="Log in" subtitle="Welcome back. Pick up where you left off.">
+      <GoogleSignIn />
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label>
           <span className="label">Email</span>
@@ -73,13 +87,12 @@ export default function Login() {
         </label>
         <label>
           <span className="label">Password</span>
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="input mt-1"
+            className="mt-1"
           />
         </label>
         <button
@@ -89,9 +102,10 @@ export default function Login() {
         >
           Forgot password?
         </button>
+        <Captcha key={captchaRound} onToken={setCaptchaToken} />
         {error && <Alert>{error}</Alert>}
         {notice && <Alert kind="success">{notice}</Alert>}
-        <button type="submit" disabled={isSubmitting} className="btn-primary mt-1 py-2.5">
+        <button type="submit" disabled={isSubmitting || isWaitingForCaptcha} className="btn-primary mt-1 py-2.5">
           <LogIn className="h-4 w-4" aria-hidden />
           {isSubmitting ? "Logging in..." : "Log in"}
         </button>

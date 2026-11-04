@@ -97,3 +97,31 @@ export async function createChallenges(roundId: string, friendIds: string[]): Pr
   const { data } = await apiClient.post<Challenge[]>("/challenges", { round_id: roundId, friend_ids: friendIds });
   return data;
 }
+
+// --- Blocking and reporting ---------------------------------------------------
+
+export interface BlockedStudent {
+  id: string;
+  name: string;
+  username: string | null;
+}
+
+export type ReportReason = "username" | "spam" | "harassment" | "other";
+
+export async function listBlocked(): Promise<BlockedStudent[]> {
+  const { data } = await apiClient.get<BlockedStudent[]>("/blocks");
+  return data;
+}
+
+/** They can no longer find you, send requests or challenge you. They are not told. */
+export async function blockStudent(userId: string): Promise<void> {
+  await apiClient.post(`/users/${userId}/block`);
+}
+
+export async function unblockStudent(userId: string): Promise<void> {
+  await apiClient.delete(`/users/${userId}/block`);
+}
+
+export async function reportStudent(userId: string, reason: ReportReason, details: string, block = true): Promise<void> {
+  await apiClient.post(`/users/${userId}/report`, { reason, details, block });
+}

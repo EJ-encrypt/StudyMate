@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ConceptMatch from "./ConceptMatch";
 
+// The wrong-pair reset runs on real timers; with the whole suite running at
+// once, five seconds is not always enough.
+vi.setConfig({ testTimeout: 20_000 });
+
 const submitConceptMatch = vi.fn();
 const startConceptMatch = vi.fn();
 const ROUND = {

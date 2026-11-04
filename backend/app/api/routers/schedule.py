@@ -21,6 +21,7 @@ from app.schemas.schedule import (
     SlotRead,
     SlotUpdate,
 )
+from app.services import limits
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +176,8 @@ async def read_timetable(
     from app.services.uploads import read_upload
 
     data, mime_type, extra_text = await read_upload(file, "your timetable")
+    limits.spend(db, current_user.id, "read")
+    db.commit()
 
     courses = db.query(Course).filter(Course.owner_id == current_user.id).all()
 

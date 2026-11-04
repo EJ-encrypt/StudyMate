@@ -23,6 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = "studymate"
 APP_URL = "https://studymate-alpha-fawn.vercel.app"
 
+# Optional settings copied from .env to Vercel on each release when present,
+# so turning one on is: add it to .env, release. VITE_ ones are baked into
+# the page at build time, so they must be in place before the build starts.
+SYNCED_SETTINGS = ("SENTRY_DSN", "VITE_SENTRY_DSN", "VITE_TURNSTILE_SITE_KEY")
+
 
 def step(text: str) -> None:
     print(f"\n== {text}")
@@ -65,6 +70,17 @@ def main() -> None:
     )
     project = api.get(f"/v9/projects/{PROJECT}")
     project.raise_for_status()
+    synced = [key for key in SYNCED_SETTINGS if env.get(key)]
+    for key in synced:
+        response = api.post(
+            f"/v10/projects/{project.json()['id']}/env",
+            params={"upsert": "true"},
+            json={"key": key, "value": env[key], "type": "encrypted", "target": ["production", "preview"]},
+        )
+        if response.status_code >= 400:
+            sys.exit(f"Could not set {key} on Vercel ({response.status_code})")
+    if synced:
+        print("   Settings updated on Vercel:", ", ".join(synced))
     files = []
     for path in git("ls-files").splitlines():
         data = subprocess.run(["git", "cat-file", "blob", f"HEAD:{path}"], cwd=ROOT, capture_output=True, check=True).stdout
