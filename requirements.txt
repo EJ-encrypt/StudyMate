@@ -1,2 +1,20 @@
-# Installed by Vercel for the Python function in api/index.py.
--r backend/requirements.txt
+# The API's Python packages. Vercel installs these for api/index.py, and
+# backend/requirements.txt points here so there is one list.
+fastapi==0.115.0
+sqlalchemy==2.0.35
+alembic==1.13.2
+psycopg2-binary==2.9.9
+pydantic[email]==2.9.2
+pydantic-settings==2.5.2
+python-multipart==0.0.9
+PyJWT[crypto]==2.10.1
+httpx==0.28.1
+requests
+pywebpush==2.0.3
+# zoneinfo needs a time zone database, which Windows does not ship.
+tzdata
+pdfplumber==0.11.4
+python-docx==1.1.2
+python-pptx==1.0.2
+google-genai
+openai
