@@ -1,5 +1,10 @@
 """Put the committed code live: update the database, deploy to Vercel, check it answers.
 
+Once the Vercel project is linked to GitHub, every push to main deploys by
+itself, but without the database step. So day-to-day work is pushed to a
+feature branch, and main is only pushed here, after the database is updated.
+Before the link exists, the committed files are uploaded to Vercel directly.
+
 Run from the StudyMate folder:
 
     backend\\.venv\\Scripts\\python scripts\\release.py
@@ -37,6 +42,49 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout
 
 
+def upload_deployment(api: httpx.Client, project_id: str) -> str:
+    """Send the committed files straight to Vercel; used when no GitHub link exists."""
+    files = []
+    for path in git("ls-files").splitlines():
+        data = subprocess.run(["git", "cat-file", "blob", f"HEAD:{path}"], cwd=ROOT, capture_output=True, check=True).stdout
+        sha = hashlib.sha1(data).hexdigest()
+        upload = api.post("/v2/files", content=data, headers={"x-vercel-digest": sha, "Content-Type": "application/octet-stream"})
+        if upload.status_code >= 400:
+            sys.exit(f"Upload of {path} failed ({upload.status_code})")
+        files.append({"file": path, "sha": sha, "size": len(data)})
+    print(f"   {len(files)} files uploaded.")
+    deployment = api.post(
+        "/v13/deployments",
+        params={"forceNew": "1", "skipAutoDetectionConfirmation": "1"},
+        json={
+            "name": PROJECT,
+            "project": project_id,
+            "target": "production",
+            "files": files,
+            "projectSettings": {"framework": "vite"},
+        },
+    )
+    deployment.raise_for_status()
+    return deployment.json()["id"]
+
+
+def github_deployment(api: httpx.Client, project_id: str) -> str | None:
+    """Push HEAD to main and find the production build Vercel starts for it."""
+    commit = git("rev-parse", "HEAD").strip()
+    pushed = subprocess.run(["git", "push", "origin", "HEAD:main"], cwd=ROOT, capture_output=True, text=True)
+    if pushed.returncode != 0:
+        sys.exit(f"Could not push to main:\n{pushed.stderr.strip()}")
+    print("   Pushed to main; waiting for Vercel to start the build.")
+    for _ in range(18):
+        listing = api.get("/v6/deployments", params={"projectId": project_id, "target": "production", "limit": 10})
+        for deployment in listing.json().get("deployments", []):
+            if (deployment.get("meta") or {}).get("githubCommitSha") == commit:
+                return deployment["uid"]
+        time.sleep(10)
+    # main was already at this commit, so GitHub sent nothing to build.
+    return None
+
+
 def main() -> None:
     env = dotenv_values(ROOT / ".env")
     for key in ("DATABASE_URL", "VERCEL_TOKEN"):
@@ -62,7 +110,7 @@ def main() -> None:
         sys.exit("Database update failed; nothing was deployed.")
     print("   Database is up to date.")
 
-    step("2/3 Uploading to Vercel")
+    step("2/3 Deploying to Vercel")
     api = httpx.Client(
         base_url="https://api.vercel.com",
         headers={"Authorization": f"Bearer {env['VERCEL_TOKEN']}"},
@@ -81,28 +129,12 @@ def main() -> None:
             sys.exit(f"Could not set {key} on Vercel ({response.status_code})")
     if synced:
         print("   Settings updated on Vercel:", ", ".join(synced))
-    files = []
-    for path in git("ls-files").splitlines():
-        data = subprocess.run(["git", "cat-file", "blob", f"HEAD:{path}"], cwd=ROOT, capture_output=True, check=True).stdout
-        sha = hashlib.sha1(data).hexdigest()
-        upload = api.post("/v2/files", content=data, headers={"x-vercel-digest": sha, "Content-Type": "application/octet-stream"})
-        if upload.status_code >= 400:
-            sys.exit(f"Upload of {path} failed ({upload.status_code})")
-        files.append({"file": path, "sha": sha, "size": len(data)})
-    print(f"   {len(files)} files uploaded.")
-    deployment = api.post(
-        "/v13/deployments",
-        params={"forceNew": "1", "skipAutoDetectionConfirmation": "1"},
-        json={
-            "name": PROJECT,
-            "project": project.json()["id"],
-            "target": "production",
-            "files": files,
-            "projectSettings": {"framework": "vite"},
-        },
-    )
-    deployment.raise_for_status()
-    deployment_id = deployment.json()["id"]
+    project_id = project.json()["id"]
+    deployment_id = None
+    if project.json().get("link"):
+        deployment_id = github_deployment(api, project_id)
+    if deployment_id is None:
+        deployment_id = upload_deployment(api, project_id)
 
     step("3/3 Building (2 to 4 minutes)")
     state = ""

@@ -26,13 +26,13 @@ export default function AuthLayout({
 
   return (
     <div className="flex min-h-screen">
-      <section className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-navy p-10 text-white lg:flex">
+      <section className="relative hidden w-[44%] flex-col overflow-hidden bg-navy p-10 text-white lg:flex">
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-gold/10" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-white/5" />
         <span className="relative flex items-center gap-2 text-lg font-extrabold text-gold">
           <GraduationCap className="h-6 w-6" aria-hidden /> StudyMate
         </span>
-        <div className="relative">
+        <div className="relative my-auto">
           <h2 className="text-3xl font-bold leading-tight">
             Study smarter with
             <br />
@@ -49,7 +49,6 @@ export default function AuthLayout({
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-white/40">University of Ghana · BSc IT final-year project</p>
       </section>
 
       <section className="flex flex-1 items-center justify-center px-5 py-10">

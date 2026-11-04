@@ -249,8 +249,13 @@ redeploys. From the `StudyMate` folder:
 backend\.venv\Scripts\python scripts\release.py
 ```
 
-It applies any new database migrations to Supabase first, then uploads the
+It applies any new database migrations to Supabase first, then deploys the
 committed code to Vercel, waits for the build, and checks the site answers.
+Once Vercel is linked to the GitHub repository, it deploys by pushing to
+`main`; until then it uploads the files directly. **Push day-to-day work to a
+feature branch, not `main`**: with the link, a push to `main` goes live
+straight away, without the database step, so code that needs a new
+migration would reach the site before its tables exist.
 It needs `DATABASE_URL` (session pooler) and `VERCEL_TOKEN` in `.env`, and
 deploys only what is committed. If the database step fails, nothing is
 deployed. It also copies `SENTRY_DSN`, `VITE_SENTRY_DSN` and
