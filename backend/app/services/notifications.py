@@ -81,7 +81,7 @@ def _email_html(note: Notification) -> str:
   <h1 style="font-size:20px;margin:0 0 8px">{escape(note.title)}</h1>
   <p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#334">{escape(note.body)}</p>
   <a href="{escape(note.url)}" style="display:inline-block;background:#0A1F44;color:#D4AF37;padding:10px 18px;border-radius:8px;font-weight:600;text-decoration:none">Open StudyMate</a>
-  <p style="font-size:12px;color:#889;margin-top:24px">You can turn these emails off in your StudyMate profile.</p>
+  <p style="font-size:12px;color:#889;margin-top:24px">You can turn these emails off in StudyMate under Settings, Lecture reminders.</p>
 </div>"""
 
 
@@ -93,7 +93,7 @@ def send_email(user: User, note: Notification) -> bool:
     message["Subject"] = note.title
     message["From"] = settings.email_from
     message["To"] = user.email
-    message.set_content(f"{note.body}\n\n{note.url}\n\nTurn these emails off in your StudyMate profile.")
+    message.set_content(f"{note.body}\n\n{note.url}\n\nTurn these emails off in StudyMate under Settings, Lecture reminders.")
     message.add_alternative(_email_html(note), subtype="html")
 
     try:

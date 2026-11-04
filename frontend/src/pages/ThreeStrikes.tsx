@@ -6,6 +6,7 @@ import GameResultCard from "../components/GameResultCard";
 import { GameError, GameIntro } from "../components/GameIntro";
 import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
+import { normalizeAnswer } from "../lib/answers";
 import { useArcadeRound } from "../lib/useArcadeRound";
 
 const FEEDBACK_MS = 1100;
@@ -13,17 +14,6 @@ const FEEDBACK_MS = 1100;
 // Mirrors app.services.arcade on the server, which has the final say.
 const secondsFor = (correct: number) => Math.max(7, 20 - Math.floor(correct / 3) * 2);
 const levelFor = (correct: number) => 1 + Math.floor(correct / 5);
-
-function normalize(text: string): string {
-  return text
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word && !["a", "an", "the"].includes(word))
-    .join(" ");
-}
 
 /** Three Strikes: keep answering until your third mistake. It gets faster as you go. */
 export default function ThreeStrikes() {
@@ -67,7 +57,7 @@ export default function ThreeStrikes() {
       if (!question || answered.current) return;
       answered.current = true;
       const timeMs = Math.round(performance.now() - shownAt.current);
-      const isRight = timeMs <= limitMs && !!response && normalize(response) === normalize(question.answer);
+      const isRight = timeMs <= limitMs && !!response && normalizeAnswer(response) === normalizeAnswer(question.answer);
       setAnswers((prev) => [...prev, { key: question.item_id, response, time_ms: timeMs, correct: isRight }]);
       setPhase("feedback");
     },
@@ -190,7 +180,7 @@ export default function ThreeStrikes() {
           {question.options.length > 0 ? (
             <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
               {question.options.map((option) => {
-                const isAnswer = normalize(option) === normalize(question.answer);
+                const isAnswer = normalizeAnswer(option) === normalizeAnswer(question.answer);
                 const chosen = showing && last.response === option;
                 return (
                   <button

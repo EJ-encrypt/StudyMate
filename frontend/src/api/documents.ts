@@ -15,25 +15,10 @@ export interface DocumentSummary {
   created_at: string;
 }
 
-export interface Concept {
-  id: string;
-  name: string;
-  summary: string;
-}
-
-export interface DocumentDetail extends DocumentSummary {
-  concepts: Concept[];
-}
-
 export async function listDocuments(courseId: string): Promise<DocumentSummary[]> {
   const { data } = await apiClient.get<DocumentSummary[]>("/documents", {
     params: { course_id: courseId },
   });
-  return data;
-}
-
-export async function getDocument(documentId: string): Promise<DocumentDetail> {
-  const { data } = await apiClient.get<DocumentDetail>(`/documents/${documentId}`);
   return data;
 }
 

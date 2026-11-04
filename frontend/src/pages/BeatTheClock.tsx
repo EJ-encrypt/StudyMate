@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { ClockRound } from "../api/games";
 import GameResultCard from "../components/GameResultCard";
+import { normalizeAnswer } from "../lib/answers";
 import { useArcadeRound } from "../lib/useArcadeRound";
 import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
@@ -18,18 +19,6 @@ interface Answer {
 }
 
 const FEEDBACK_MS = 1200;
-
-/** Mirrors the server's marking closely enough for instant feedback; the server's verdict is final. */
-function normalize(text: string): string {
-  return text
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word && !["a", "an", "the"].includes(word))
-    .join(" ");
-}
 
 function points(timeMs: number, limitMs: number, streak: number): number {
   const remaining = Math.max(0, limitMs - Math.min(Math.max(timeMs, 0), limitMs));
@@ -93,7 +82,7 @@ export default function BeatTheClock() {
       if (!question || answeredRef.current) return;
       answeredRef.current = true;
       const timeMs = Math.round(performance.now() - startedAt.current);
-      const correct = timeMs <= limitMs && !!response && normalize(response) === normalize(question.answer);
+      const correct = timeMs <= limitMs && !!response && normalizeAnswer(response) === normalizeAnswer(question.answer);
       const nextStreak = correct ? streak + 1 : 0;
       setStreak(nextStreak);
       if (correct) setScore((s) => s + points(timeMs, limitMs, nextStreak));
@@ -278,7 +267,7 @@ export default function BeatTheClock() {
         {question && question.options.length > 0 ? (
           <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
             {question.options.map((option) => {
-              const isAnswer = normalize(option) === normalize(question.answer);
+              const isAnswer = normalizeAnswer(option) === normalizeAnswer(question.answer);
               const chosen = showing && lastAnswer.response === option;
               return (
                 <button

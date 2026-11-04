@@ -10,29 +10,41 @@ Department of Computer Science.
 
 ## What it does
 
-- **Ingests** PDF, DOCX, PPTX and plain text/Markdown files, plus notes
-  typed straight into the app.
-- **Extracts key concepts** from each document automatically.
+- **Ingests** PDF, DOCX, PPTX and plain text/Markdown files, notes typed
+  straight into the app, and photos of handwritten notes (turned into a PDF
+  on the phone and read by the AI, handwriting included).
+- **Extracts key concepts** from each document automatically, remembering
+  the page or slide each one came from.
 - **Builds a cumulative knowledge base** per student per course, merging a
-  topic taught across several lectures into one entry.
+  topic taught across several lectures into one entry, with a running
+  summary of the course so far.
 - **Generates** flashcards, multiple choice, fill-in-the-blank,
-  short-answer questions and full exam papers — from one lecture or from
+  short-answer questions and full exam papers, from one lecture or from
   the whole course.
 - **Marks** your answers: instantly for multiple choice and fill-in-the-
   blank, and with an AI judge for written answers, which accepts a correct
   answer in your own words.
-- **Coaches** you: per-concept mastery, weak-topic detection, and a ranked
-  list of what to revise next.
-- **Tracks progress** with XP, daily streaks and badges.
-- **Arcade**: two revision games built from your own material. *Beat the
-  Clock* is a timed sprint through your multiple-choice and fill-in-the-blank
-  questions, and *Concept Match* is a memory game pairing concepts with their
-  meanings.
+- **Spaced repetition**: flashcards you mark "Still learning" come back
+  after 1, 3, 7, 14 and 30 days (Leitner boxes).
+- **Coaches** you: per-concept mastery, weak-topic detection, and up to five
+  topics to revise next. Each topic opens to its concepts, where each is
+  explained in your material (page or slide), and how they fit together.
+- **Tracks progress** with XP, daily streaks, badges and a daily goal.
+- **Arcade**: five revision games built from your own material: Beat the
+  Clock, Concept Match, True or False, Odd One Out and Three Strikes.
+- **Leaderboard**: friends by username, weekly and all-time XP, challenges
+  to beat a friend's score on the same round, an opt-in board for your
+  programme, and report/block.
+- **Levels and semesters**: courses are kept per level and semester, so
+  earlier levels stay available, and the Study Engine, Coach and Arcade can
+  revise any of them.
 - **Lecture timetable and reminders**: type your timetable in, or upload a
   photo or PDF of it and the AI reads it. You are reminded an hour before each
   lecture and when it starts. When it ends, you are prompted to upload the
   slides or write down what you learnt, which goes into your notes.
   Reminders arrive as push notifications, by email, or both.
+- **Works on phones** as an installable web app, with a guided tour, offline
+  messages and daily limits on AI use so the free tiers last.
 
 Deliberately out of scope: audio/video transcription, plagiarism
 detection, LMS integration, non-English material.
@@ -98,7 +110,11 @@ backend/      FastAPI
     knowledge_base.py concept de-duplication and merging
     coaching.py       mastery, weak topics, recommendations
     gamification.py   XP, streaks, badges
-    games.py          Beat the Clock and Concept Match rounds and scoring
+    games.py, arcade.py  the five Arcade games: rounds and scoring
+    review.py         spaced-repetition flashcard reviews
+    social.py         friends, challenges, leaderboards, blocks
+    sources.py        which page or slide a concept came from
+    limits.py         daily AI limits
     reminders.py      which lecture reminders are due, sent exactly once
     notifications.py  web push and email delivery
     storage.py        Supabase Storage (or a local folder in development)
@@ -143,11 +159,12 @@ include worked problems, and numeric answers are marked as numbers.
 
 ## Project status
 
-Phases 0–6 of the build plan are complete. On top of them, the app now runs
-on Vercel and Supabase, and has the Arcade, the lecture timetable with
-reminders, and a redesigned interface that works on phones. Phase 7's
-evaluation instruments are prepared; the usability sessions, instructor
-review and write-up remain to be carried out.
+All phases of the build plan are complete and the app is live at
+https://studymate-alpha-fawn.vercel.app. Beyond the plan it has the Arcade,
+friends and leaderboards, the lecture timetable with reminders, spaced
+repetition and an interface that works on phones. The evaluation
+instruments in [docs/evaluation/](./docs/evaluation/) are prepared; the
+usability sessions and instructor review are the remaining Phase 7 work.
 
 See [docs/implementation-notes.md](./docs/implementation-notes.md) for
 what was verified and how.

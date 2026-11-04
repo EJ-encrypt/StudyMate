@@ -80,7 +80,7 @@ export const TOUR_STEPS: TourStep[] = [
     path: "/settings",
     target: "nav-settings",
     title: "Settings",
-    body: "Tap any row to open it: Progress & badges, Daily goal, Profile (your name, username and level), Password, Privacy, Lecture reminders, Permissions and Appearance. Log out and Delete account are at the bottom. On an iPhone, notifications need StudyMate on your Home Screen; Permissions shows you how.",
+    body: "Tap any row to open it: Progress & badges, Daily goal, Profile (your name, username and level), Password, Privacy, Lecture reminders, Permissions and Appearance. Support has this tour and the terms of use; Log out and Delete account are at the bottom. On an iPhone, notifications need StudyMate on your Home Screen; Permissions shows you how.",
   },
   {
     path: "/settings",

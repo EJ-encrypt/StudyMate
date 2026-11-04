@@ -5,14 +5,6 @@ export type GameName = "beat_the_clock" | "concept_match" | "true_false" | "odd_
 /** How each game appears in URLs: /play/:courseId/:path and /games/:courseId/:slug. */
 export type GameSlug = "beat-the-clock" | "concept-match" | "true-false" | "odd-one-out" | "three-strikes";
 
-export const GAME_SLUGS: Record<GameName, GameSlug> = {
-  beat_the_clock: "beat-the-clock",
-  concept_match: "concept-match",
-  true_false: "true-false",
-  odd_one_out: "odd-one-out",
-  three_strikes: "three-strikes",
-};
-
 /** Page path under /play/:courseId/ for each game. */
 export const GAME_PATHS: Record<GameName, string> = {
   beat_the_clock: "clock",
@@ -186,7 +178,3 @@ export async function submitChallenge(challengeId: string, submission: RoundSubm
   const { data } = await apiClient.post<GameResult>(`/challenges/${challengeId}/submit`, submission);
   return data;
 }
-
-// Kept for the existing pages and tests.
-export const startConceptMatch = (courseId: string, documentId?: string | null) =>
-  startRound<MatchRound>(courseId, "concept-match", documentId);
