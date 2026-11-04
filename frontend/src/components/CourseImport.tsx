@@ -30,12 +30,23 @@ function defaultTicks(proposals: CourseProposal[], level: number, semester: numb
  * courses being taken this semester. Those are added under the level and
  * semester chosen here, which default to the student's current ones.
  */
-export default function CourseImport({ onDone, onCancel }: { onDone: (added: number) => void; onCancel: () => void }) {
+export default function CourseImport({
+  onDone,
+  onCancel,
+  defaultLevel,
+  defaultSemester,
+}: {
+  onDone: (added: number) => void;
+  onCancel: () => void;
+  /** The level and semester being looked at, when not the student's current ones. */
+  defaultLevel?: number;
+  defaultSemester?: number;
+}) {
   const { user } = useAuth();
   const [proposals, setProposals] = useState<CourseProposal[] | null>(null);
   const [ticked, setTicked] = useState<Set<number>>(new Set());
-  const [level, setLevel] = useState(user?.level ?? 100);
-  const [semester, setSemester] = useState(user?.semester ?? 1);
+  const [level, setLevel] = useState(defaultLevel ?? user?.level ?? 100);
+  const [semester, setSemester] = useState(defaultSemester ?? user?.semester ?? 1);
   const [isReading, setIsReading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

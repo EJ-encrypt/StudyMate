@@ -4,12 +4,10 @@ import {
   Flame,
   Gamepad2,
   Lock,
-  LogOut,
   LucideIcon,
   Medal,
   NotebookPen,
   Rocket,
-  Settings,
   Shield,
   Star,
   Swords,
@@ -17,18 +15,15 @@ import {
   Timer,
   Trophy,
   UploadCloud,
-  UserCircle,
   Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import { getProgress, ProgressSummary } from "../api/profile";
 import DailyGoalRing from "../components/DailyGoalRing";
-import PageHeader from "../components/PageHeader";
 import { Alert, ListSkeleton, StatTile } from "../components/ui";
-import { useAuth } from "../context/AuthContext";
 
 const BADGE_ICONS: Record<string, LucideIcon> = {
   first_upload: UploadCloud,
@@ -48,8 +43,8 @@ const BADGE_ICONS: Record<string, LucideIcon> = {
   challenge_won: Swords,
 };
 
-export default function Profile() {
-  const { user, logout } = useAuth();
+/** XP, streaks, today's goal and badges: shown in Settings, under Progress & badges. */
+export function ProgressPanel() {
   const [progress, setProgress] = useState<ProgressSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,22 +58,6 @@ export default function Profile() {
 
   return (
     <>
-      <PageHeader
-        icon={UserCircle}
-        title={user?.full_name ?? "Profile"}
-        subtitle={[user?.programme, user?.level ? `Level ${user.level}` : null].filter(Boolean).join(" · ") || user?.email}
-        actions={
-          <>
-            <Link to="/friends" className="btn-gold">
-              <Users className="h-4 w-4" aria-hidden /> Leaderboard & friends
-            </Link>
-            <button type="button" onClick={() => void logout()} className="btn-secondary md:hidden">
-              <LogOut className="h-4 w-4" aria-hidden /> Log out
-            </button>
-          </>
-        }
-      />
-
       {error && <Alert>{error}</Alert>}
       {!progress && !error && <ListSkeleton rows={2} />}
 
@@ -131,26 +110,11 @@ export default function Profile() {
         </>
       )}
 
-      <section className="mt-8">
-        <h2 className="section-title">Account</h2>
-        <dl className="card grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 p-4 text-sm">
-          {user?.username && (
-            <>
-              <dt className="text-ink/55">Username</dt>
-              <dd className="truncate text-ink">@{user.username}</dd>
-            </>
-          )}
-          <dt className="text-ink/55">Email</dt>
-          <dd className="truncate text-ink">{user?.email}</dd>
-          <dt className="text-ink/55">School</dt>
-          <dd className="text-ink">{user?.school ?? "—"}</dd>
-          <dt className="text-ink/55">Time zone</dt>
-          <dd className="text-ink">{user?.timezone}</dd>
-        </dl>
-        <Link to="/settings" className="btn-secondary mt-3">
-          <Settings className="h-4 w-4" aria-hidden /> Settings and reminders
-        </Link>
-      </section>
     </>
   );
+}
+
+/** The old Profile address, kept so earlier links and notifications still land somewhere. */
+export default function Profile() {
+  return <Navigate to="/settings?section=progress" replace />;
 }

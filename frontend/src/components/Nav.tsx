@@ -1,6 +1,7 @@
 import {
   Brain,
   CalendarClock,
+  ChevronDown,
   Gamepad2,
   GraduationCap,
   Library,
@@ -8,12 +9,14 @@ import {
   LucideIcon,
   Settings,
   Trophy,
-  UserCircle,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import { useCourseLevels } from "../lib/courseLevels";
 import { CoachIcon } from "../lib/icons";
+import { formatXp, useXp } from "../lib/useXp";
 
 interface NavItem {
   to: string;
@@ -21,23 +24,23 @@ interface NavItem {
   /** Shorter label for the phone tab bar, where width is tight. */
   short: string;
   icon: LucideIcon;
+  /** Where the guided tour points (data-tour). */
+  tour: string;
 }
 
-const COURSES: NavItem = { to: "/courses", label: "My Courses", short: "Courses", icon: Library };
-const STUDY: NavItem = { to: "/study", label: "Study Engine", short: "Study", icon: Brain };
-const COACH: NavItem = { to: "/coach", label: "Coach", short: "Coach", icon: CoachIcon };
-const ARCADE: NavItem = { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2 };
-const LEADERBOARD: NavItem = { to: "/friends", label: "Leaderboard", short: "Leaderboard", icon: Trophy };
-const TIMETABLE: NavItem = { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock };
-const PROFILE: NavItem = { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle };
-const SETTINGS: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings };
+const COURSES: NavItem = { to: "/courses", label: "My Courses", short: "Courses", icon: Library, tour: "nav-courses" };
+const STUDY: NavItem = { to: "/study", label: "Study Engine", short: "Study", icon: Brain, tour: "nav-study" };
+const COACH: NavItem = { to: "/coach", label: "Coach", short: "Coach", icon: CoachIcon, tour: "nav-coach" };
+const ARCADE: NavItem = { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2, tour: "nav-arcade" };
+const LEADERBOARD: NavItem = { to: "/friends", label: "Leaderboard", short: "Leaderboard", icon: Trophy, tour: "nav-leaderboard" };
+const TIMETABLE: NavItem = { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock, tour: "nav-timetable" };
+const SETTINGS: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings, tour: "nav-settings" };
 
-/** Every page, in order, for the sidebar. */
-export const NAV_ITEMS: NavItem[] = [COURSES, STUDY, COACH, ARCADE, LEADERBOARD, TIMETABLE, PROFILE, SETTINGS];
+/** Every page, in order, for the sidebar. Profile now lives inside Settings. */
+export const NAV_ITEMS: NavItem[] = [COURSES, STUDY, COACH, ARCADE, LEADERBOARD, TIMETABLE, SETTINGS];
 
-/** The phone tab bar has room for six; Leaderboard and Settings sit in the phone header instead. */
-const HEADER_ITEMS = [LEADERBOARD, SETTINGS];
-export const TAB_ITEMS = NAV_ITEMS.filter((item) => !HEADER_ITEMS.includes(item));
+/** The phone tab bar has room for six; the Leaderboard sits in the phone header, with the XP. */
+export const TAB_ITEMS = NAV_ITEMS.filter((item) => item !== LEADERBOARD);
 
 function Brand() {
   return (
@@ -50,9 +53,78 @@ function Brand() {
   );
 }
 
+function sidebarLink(isActive: boolean) {
+  return [
+    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+    isActive ? "bg-white/10 font-semibold text-gold" : "text-white/70 hover:bg-white/5 hover:text-white",
+  ].join(" ");
+}
+
+/** My Courses, opening to the levels; each level shows its two semesters. */
+function CoursesLink() {
+  const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const { levels: withCourses, current } = useCourseLevels();
+  const onCourses = pathname.startsWith("/courses");
+  const [isOpen, setIsOpen] = useState(onCourses);
+  const shownLevel = Number(params.get("level")) || current;
+  // A level just started has no courses yet, but is listed while it is open.
+  const levels =
+    onCourses && !withCourses.includes(shownLevel) ? [...withCourses, shownLevel].sort((a, b) => a - b) : withCourses;
+
+  useEffect(() => {
+    if (onCourses) setIsOpen(true);
+  }, [onCourses]);
+
+  return (
+    <div>
+      <div className="flex items-center">
+        <NavLink to="/courses" data-tour={COURSES.tour} className={({ isActive }) => `${sidebarLink(isActive)} flex-1`}>
+          <Library className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          {COURSES.label}
+        </NavLink>
+        {levels.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsOpen((open) => !open)}
+            aria-expanded={isOpen}
+            aria-label={isOpen ? "Hide levels" : "Show levels"}
+            className="rounded-lg p-2 text-white/60 hover:bg-white/5 hover:text-white"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden />
+          </button>
+        )}
+      </div>
+      {isOpen && levels.length > 0 && (
+        <ul className="mb-1 ml-6 mt-0.5 space-y-0.5 border-l border-white/10 pl-2" aria-label="Levels">
+          {levels.map((level) => {
+            const active = pathname === "/courses" && shownLevel === level;
+            return (
+              <li key={level}>
+                <Link
+                  to={`/courses?level=${level}`}
+                  aria-current={active ? "page" : undefined}
+                  className={[
+                    "block rounded-md px-3 py-1.5 text-sm transition",
+                    active ? "bg-white/10 font-semibold text-gold" : "text-white/60 hover:bg-white/5 hover:text-white",
+                  ].join(" ")}
+                >
+                  Level {level}
+                  {level === current && <span className="ml-1.5 text-xs font-normal text-white/40">now</span>}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** Left sidebar on tablets and desktops. */
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const xp = useXp(!!user);
   if (!user) return null;
 
   return (
@@ -70,23 +142,21 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                [
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
-                  isActive
-                    ? "bg-white/10 font-semibold text-gold"
-                    : "text-white/70 hover:bg-white/5 hover:text-white",
-                ].join(" ")
-              }
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
-              {label}
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map(({ to, label, icon: Icon, tour }) =>
+            to === COURSES.to ? (
+              <CoursesLink key={to} />
+            ) : (
+              <NavLink key={to} to={to} data-tour={tour} className={({ isActive }) => sidebarLink(isActive)}>
+                <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                <span className="flex-1">{label}</span>
+                {to === LEADERBOARD.to && xp !== null && (
+                  <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-bold tabular-nums text-gold">
+                    {formatXp(xp)}
+                  </span>
+                )}
+              </NavLink>
+            ),
+          )}
         </nav>
 
         <button
@@ -101,33 +171,28 @@ export function Sidebar() {
   );
 }
 
-/** Slim header on phones, where the sidebar is replaced by a tab bar. */
+/** Slim header on phones: the brand, and the Leaderboard with the student's XP. */
 export function MobileHeader() {
   const { user } = useAuth();
+  const xp = useXp(!!user);
   if (!user) return null;
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between bg-navy px-4 py-2.5 md:hidden">
       <Brand />
-      <div className="flex min-w-0 items-center gap-1">
-        <span className="max-w-[40vw] truncate text-xs text-white/60">
-          {user.username ? `@${user.username}` : user.full_name}
-        </span>
-        {HEADER_ITEMS.map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          aria-label={label}
-          className={({ isActive }) =>
-            [
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
-              isActive ? "bg-white/10 text-gold" : "text-white/70 hover:bg-white/10 hover:text-white",
-            ].join(" ")
-          }
-        >
-          <Icon className="h-5 w-5" aria-hidden />
-        </NavLink>
-        ))}
-      </div>
+      <NavLink
+        to={LEADERBOARD.to}
+        data-tour={LEADERBOARD.tour}
+        aria-label={xp === null ? "Leaderboard" : `Leaderboard, ${formatXp(xp)}`}
+        className={({ isActive }) =>
+          [
+            "flex h-9 items-center gap-1.5 rounded-full px-3 transition",
+            isActive ? "bg-white/20 text-gold" : "bg-white/10 text-white hover:bg-white/15",
+          ].join(" ")
+        }
+      >
+        <Trophy className="h-4 w-4 text-gold" aria-hidden />
+        {xp !== null && <span className="text-sm font-bold tabular-nums">{formatXp(xp, true)}</span>}
+      </NavLink>
     </header>
   );
 }
@@ -143,10 +208,11 @@ export function TabBar() {
       className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-ink/10 bg-surface/95 backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-6">
-        {TAB_ITEMS.map(({ to, short, icon: Icon }) => (
+        {TAB_ITEMS.map(({ to, short, icon: Icon, tour }) => (
           <NavLink
             key={to}
             to={to}
+            data-tour={tour}
             className={({ isActive }) =>
               [
                 "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium",

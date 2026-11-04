@@ -243,7 +243,7 @@ function FriendsTab() {
             </>
           ) : (
             <>
-              Set a username in <Link to="/settings" className="font-semibold text-gold-dark">Settings</Link> so friends
+              Set a username in <Link to="/settings?section=profile" className="font-semibold text-gold-dark">Settings</Link> so friends
               can find you.
             </>
           )}

@@ -110,7 +110,7 @@ export default function StudentActions({ studentId, name, onChanged }: { student
     if (!window.confirm(`Block ${name}? They will not be able to find you, add you or challenge you. They are not told.`)) return;
     try {
       await blockStudent(studentId);
-      toast(`${name} is blocked. You can unblock them in Settings.`);
+      toast(`${name} is blocked. You can unblock them in Settings, Privacy.`);
       onChanged();
     } catch (err) {
       toast(errorMessage(err, "Could not block them."), { kind: "error" });

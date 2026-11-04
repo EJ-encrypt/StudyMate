@@ -1,45 +1,40 @@
 import {
-  Ban,
+  Award,
   BellRing,
+  Camera,
+  ChevronRight,
   Compass,
   KeyRound,
+  LogOut,
+  LucideIcon,
   Monitor,
   Moon,
   Save,
-  Settings as SettingsIcon,
+  ShieldCheck,
+  Smartphone,
   Sun,
   Target,
   Trash2,
-  Trophy,
   UserRound,
 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { updatePreferences } from "../api/auth";
 import { errorMessage } from "../api/client";
 import { BlockedStudent, getProgrammes, listBlocked, unblockStudent } from "../api/social";
 import NotificationSettings from "../components/NotificationSettings";
-import PageHeader from "../components/PageHeader";
 import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { enablePush, getNotificationConfig, isIos, pushState, PushState } from "../lib/push";
 import { Captcha, captchaEnabled } from "../lib/captcha";
 import { getThemeChoice, setThemeChoice, ThemeChoice } from "../lib/theme";
 import { toast } from "../lib/toast";
+import { startTour } from "../lib/tour";
+import { ProgressPanel } from "./Profile";
 
 const LEVELS = [100, 200, 300, 400, 500, 600];
 const MIN_PASSWORD = 8;
-
-function Section({ icon: Icon, title, children }: { icon: typeof Sun; title: string; children: ReactNode }) {
-  return (
-    <section className="mb-6">
-      <h2 className="section-title">
-        <Icon className="h-3.5 w-3.5" aria-hidden /> {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
 
 function Appearance() {
   const [choice, setChoice] = useState<ThemeChoice>(getThemeChoice);
@@ -436,32 +431,6 @@ function LeaderboardSetting() {
   );
 }
 
-function Tutorial() {
-  const { refresh } = useAuth();
-  const navigate = useNavigate();
-  const [isBusy, setIsBusy] = useState(false);
-
-  async function replay() {
-    setIsBusy(true);
-    try {
-      await updatePreferences({ tutorial_seen: false });
-      await refresh();
-      navigate("/courses");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  return (
-    <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
-      <p className="text-sm text-ink/70">A quick walk through how StudyMate works, step by step.</p>
-      <button type="button" onClick={() => void replay()} disabled={isBusy} className="btn-secondary">
-        <Compass className="h-4 w-4" aria-hidden /> Show the tutorial again
-      </button>
-    </div>
-  );
-}
-
 function DeleteAccount() {
   const { deleteAccount } = useAuth();
   const navigate = useNavigate();
@@ -527,37 +496,252 @@ function DeleteAccount() {
   );
 }
 
-export default function Settings() {
+function Permissions() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  useEffect(() => {
+    pushState().then(setState).catch(() => setState("unsupported"));
+  }, []);
+
+  async function allow() {
+    setIsBusy(true);
+    try {
+      const config = await getNotificationConfig();
+      setState(await enablePush(config.vapid_public_key));
+    } catch {
+      toast("Could not turn on notifications.", { kind: "error" });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  const blockedHelp = isIos()
+    ? "Your iPhone is blocking this. Open the Settings app, find StudyMate under Notifications, and turn it on."
+    : /android/i.test(navigator.userAgent)
+      ? "Your phone is blocking this. Open Settings, Apps, then your browser or StudyMate, Notifications, and allow it."
+      : "Your browser is blocking this. Click the icon left of the address bar, allow notifications, then reload.";
+
+  const badge: Record<PushState, { label: string; className: string }> = {
+    on: { label: "Allowed", className: "bg-green-100 text-green-800" },
+    off: { label: "Not turned on", className: "bg-ink/10 text-ink/70" },
+    denied: { label: "Blocked", className: "bg-red-100 text-red-700" },
+    "needs-install": { label: "Needs Home Screen", className: "bg-gold/25 text-ink" },
+    unsupported: { label: "Not supported", className: "bg-ink/10 text-ink/60" },
+  };
+
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader icon={SettingsIcon} title="Settings" subtitle="Appearance, your details, reminders and account." />
-      <Section icon={Sun} title="Appearance">
-        <Appearance />
-      </Section>
-      <Section icon={UserRound} title="Your details">
-        <ProfileForm />
-      </Section>
-      <Section icon={Target} title="Daily goal">
-        <DailyGoal />
-      </Section>
-      <Section icon={Trophy} title="Leaderboards">
+    <div className="card divide-y divide-ink/5 p-4">
+      <div className="flex items-start gap-3 pb-4">
+        <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-ink/55" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-ink">Notifications</p>
+            {state && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badge[state].className}`}>
+                {badge[state].label}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-ink/60">
+            {state === "denied"
+              ? blockedHelp
+              : state === "needs-install"
+                ? "On an iPhone, reminders only reach StudyMate once it is on your Home Screen: tap Share in Safari, then Add to Home Screen, and open it from there."
+                : "Lecture reminders, friend requests and challenges on this device, even when StudyMate is closed."}
+          </p>
+          {state === "off" && (
+            <button type="button" onClick={() => void allow()} disabled={isBusy} className="btn-secondary mt-2 py-1.5">
+              Allow notifications
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-start gap-3 pt-4">
+        <Camera className="mt-0.5 h-5 w-5 shrink-0 text-ink/55" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-ink">Camera</p>
+            <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/70">Asked each time</span>
+          </div>
+          <p className="mt-0.5 text-sm text-ink/60">
+            Photographing notes or a timetable opens your phone's own camera. StudyMate only sees the photos you
+            choose to save.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- The menu ---------------------------------------------------------------------
+
+interface SubPage {
+  title: string;
+  description: string;
+  body: () => JSX.Element;
+}
+
+const PAGES: Record<string, SubPage> = {
+  progress: { title: "Progress & badges", description: "Your XP, streaks, today's goal and the badges you have earned.", body: ProgressPanel },
+  goal: { title: "Daily goal", description: "How many study sessions make a good day.", body: DailyGoal },
+  profile: { title: "Profile", description: "Your name, username, programme, and the level and semester you are in.", body: ProfileForm },
+  password: { title: "Password", description: "Change the password you log in with.", body: PasswordForm },
+  privacy: {
+    title: "Privacy",
+    description: "Who sees you on leaderboards, and who you have blocked.",
+    body: () => (
+      <div className="space-y-5">
         <LeaderboardSetting />
-      </Section>
-      <Section icon={Ban} title="Blocked students">
-        <BlockedStudents />
-      </Section>
-      <Section icon={BellRing} title="Lecture reminders">
-        <NotificationSettings />
-      </Section>
-      <Section icon={KeyRound} title="Password">
-        <PasswordForm />
-      </Section>
-      <Section icon={Compass} title="Help">
-        <Tutorial />
-      </Section>
-      <Section icon={Trash2} title="Delete account">
-        <DeleteAccount />
-      </Section>
+        <div>
+          <h3 className="section-title">Blocked students</h3>
+          <BlockedStudents />
+        </div>
+      </div>
+    ),
+  },
+  reminders: { title: "Lecture reminders", description: "How reminders before and after each lecture reach you.", body: NotificationSettings },
+  permissions: { title: "Permissions", description: "What StudyMate may use on this device. Nothing is turned on without asking you.", body: Permissions },
+  appearance: { title: "Appearance", description: "Light, dark, or whatever your device uses.", body: Appearance },
+  delete: { title: "Delete account", description: "Remove your account and everything in it.", body: DeleteAccount },
+};
+
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-1.5 px-4 text-xs font-semibold uppercase tracking-wider text-ink/50">{title}</h2>
+      <div className="card divide-y divide-ink/5 overflow-hidden">{children}</div>
+    </section>
+  );
+}
+
+function Row({
+  icon: Icon,
+  label,
+  value,
+  onClick,
+  chevron = true,
+  danger = false,
+  tour,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value?: ReactNode;
+  onClick: () => void;
+  chevron?: boolean;
+  danger?: boolean;
+  tour?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-tour={tour}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-ink/5"
+    >
+      <Icon className={`h-[18px] w-[18px] shrink-0 ${danger ? "text-red-600" : "text-ink/50"}`} aria-hidden />
+      <span className={`flex-1 font-medium ${danger ? "text-red-600" : "text-ink"}`}>{label}</span>
+      {value !== undefined && <span className="truncate text-sm text-ink/55">{value}</span>}
+      {chevron && <ChevronRight className="h-[18px] w-[18px] shrink-0 text-ink/30" aria-hidden />}
+    </button>
+  );
+}
+
+const THEME_LABELS: Record<ThemeChoice, string> = { light: "Light", dark: "Dark", system: "System" };
+
+export default function Settings() {
+  const { user, hasPassword, logout } = useAuth();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const page = PAGES[params.get("section") ?? ""];
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page]);
+
+  function open(section: string) {
+    setParams({ section });
+  }
+
+  function back() {
+    // Back to the menu the way the student came, so the phone's back gesture agrees.
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else setParams({}, { replace: true });
+  }
+
+  if (page) {
+    const Body = page.body;
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        <button type="button" onClick={back} className="self-start text-sm font-semibold text-gold-dark hover:underline">
+          ← Settings
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-ink">{page.title}</h1>
+          <p className="text-sm text-ink/60">{page.description}</p>
+        </div>
+        <Body />
+      </div>
+    );
+  }
+
+  const name = user?.username ? `@${user.username}` : user?.full_name ?? "Student";
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">Settings</h1>
+
+      <div className="flex items-center gap-3">
+        <span
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy text-lg font-bold uppercase text-gold"
+          aria-hidden
+        >
+          {(user?.full_name || name).replace("@", "")[0]}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{user?.full_name}</p>
+          <p className="truncate text-sm text-ink/55">
+            {user?.username ? `@${user.username} · ` : ""}
+            {user?.email}
+          </p>
+        </div>
+      </div>
+
+      <Group title="Your progress">
+        <Row icon={Award} label="Progress & badges" onClick={() => open("progress")} tour="settings-progress" />
+        <Row icon={Target} label="Daily goal" value={`${user?.daily_goal ?? 3} a day`} onClick={() => open("goal")} />
+      </Group>
+
+      <Group title="Personal information">
+        <Row
+          icon={UserRound}
+          label="Profile"
+          value={user?.level ? `Level ${user.level} · Sem ${user.semester ?? 1}` : undefined}
+          onClick={() => open("profile")}
+        />
+        <Row icon={KeyRound} label="Password" value={hasPassword ? undefined : "Not set"} onClick={() => open("password")} />
+        <Row
+          icon={ShieldCheck}
+          label="Privacy"
+          value={user?.public_leaderboard ? "On programme board" : undefined}
+          onClick={() => open("privacy")}
+        />
+      </Group>
+
+      <Group title="Preferences">
+        <Row icon={BellRing} label="Lecture reminders" onClick={() => open("reminders")} />
+        <Row icon={Smartphone} label="Permissions" onClick={() => open("permissions")} />
+        <Row icon={Sun} label="Appearance" value={THEME_LABELS[getThemeChoice()]} onClick={() => open("appearance")} />
+      </Group>
+
+      <Group title="Support">
+        <Row icon={Compass} label="App tour" onClick={startTour} chevron={false} tour="settings-tour" />
+      </Group>
+
+      <Group title="Account">
+        <Row icon={LogOut} label="Log out" onClick={() => void logout()} chevron={false} />
+        <Row icon={Trash2} label="Delete account" onClick={() => open("delete")} danger />
+      </Group>
     </div>
   );
 }

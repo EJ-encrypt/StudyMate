@@ -4,7 +4,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import { MobileHeader, Sidebar, TabBar } from "./components/Nav";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Toaster from "./components/Toaster";
-import Tutorial from "./components/Tutorial";
+import Tour from "./components/Tour";
 import { useAuth } from "./context/AuthContext";
 import Arcade from "./pages/Arcade";
 import BeatTheClock from "./pages/BeatTheClock";
@@ -49,7 +49,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-canvas">
-      <Tutorial />
+      <Tour />
       <Sidebar />
       <div className="min-w-0 flex-1">
         <MobileHeader />

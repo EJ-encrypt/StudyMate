@@ -22,7 +22,7 @@ export default function TermPicker({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2" data-tour="term-picker">
       <label className="min-w-0 flex-1 sm:w-32 sm:flex-none">
         <span className="sr-only">Level</span>
         <select

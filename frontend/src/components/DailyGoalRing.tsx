@@ -39,7 +39,7 @@ export default function DailyGoalRing({ done, goal }: { done: number; goal: numb
             : `${goal - done} more study session${goal - done === 1 ? "" : "s"} to go: a quiz, an Arcade round, or ten flashcards.`}
         </p>
       </div>
-      <Link to="/settings" className="btn-ghost shrink-0 text-xs">
+      <Link to="/settings?section=goal" className="btn-ghost shrink-0 text-xs">
         Change
       </Link>
     </section>

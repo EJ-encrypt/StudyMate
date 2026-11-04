@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { errorMessage } from "../api/client";
 import { Course, deleteCourse } from "../api/courses";
+import { refreshCourses } from "../lib/courseLevels";
 import { toast } from "../lib/toast";
 import { Alert } from "./ui";
 
@@ -19,8 +20,9 @@ export default function DeleteCourse({ course }: { course: Course }) {
     setError(null);
     try {
       await deleteCourse(course.id);
+      await refreshCourses().catch(() => undefined);
       toast(`${course.code} deleted.`);
-      navigate("/courses", { replace: true });
+      navigate(`/courses?level=${course.level}`, { replace: true });
     } catch (err) {
       setError(errorMessage(err, "Could not delete this course."));
       setIsDeleting(false);

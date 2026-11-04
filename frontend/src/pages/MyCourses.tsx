@@ -1,139 +1,149 @@
-import { FileUp, Library, Plus, X } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { ArrowUpCircle, FileUp, Library, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
-import { Course, createCourse, groupByLevelAndSemester, listCourses } from "../api/courses";
+import { updatePreferences } from "../api/auth";
+import { errorMessage } from "../api/client";
+import AddCoursesForm from "../components/AddCoursesForm";
 import CourseCard from "../components/CourseCard";
 import CourseImport from "../components/CourseImport";
 import PageHeader from "../components/PageHeader";
 import { Alert, EmptyState, ListSkeleton } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { refreshCourses, useCourseLevels } from "../lib/courseLevels";
+import { toast } from "../lib/toast";
 
-const LEVELS = [100, 200, 300, 400, 500, 600];
+const HIGHEST_LEVEL = 900;
 
+/**
+ * Courses one level at a time, Semester 1 then Semester 2. Earlier levels
+ * stay here when the student moves up: the sidebar (or, on a phone, the level
+ * chips) switches between them.
+ */
 export default function MyCourses() {
-  const { user } = useAuth();
-  const [courses, setCourses] = useState<Course[] | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
+  const { user, refresh } = useAuth();
+  const { courses, levels, current } = useCourseLevels();
+  const [params, setParams] = useSearchParams();
+  const [adding, setAdding] = useState<{ semester: number } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [level, setLevel] = useState(user?.level ?? 100);
-  const [semester, setSemester] = useState(user?.semester ?? 1);
   const [error, setError] = useState<string | null>(null);
 
+  // File counts change as material is uploaded elsewhere, so re-read on arrival.
   useEffect(() => {
-    listCourses()
-      .then(setCourses)
-      .catch(() => {
-        setCourses([]);
-        setError("Could not load your courses.");
-      });
+    refreshCourses().catch(() => setError("Could not load your courses."));
   }, []);
 
-  async function handleAdd(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
+  const level = Number(params.get("level")) || current;
+  const shownLevels = levels.includes(level) ? levels : [...levels, level].sort((a, b) => a - b);
+  const inLevel = (courses ?? []).filter((course) => course.level === level);
+  const nextLevel = Math.max(...shownLevels) + 100;
+
+  function showLevel(value: number) {
+    setParams({ level: String(value) });
+    setAdding(null);
+    setIsImporting(false);
+  }
+
+  async function makeCurrent() {
     try {
-      await createCourse({ name, code, level, semester });
-      setCourses(await listCourses());
-      setCode("");
-      setName("");
-      setIsAdding(false);
-    } catch {
-      setError("Could not add that course.");
+      await updatePreferences({ level, semester: 1 });
+      await refresh();
+      toast(`Level ${level} is now your current level.`);
+    } catch (err) {
+      setError(errorMessage(err, "Could not change your level."));
     }
   }
 
-  const groups = groupByLevelAndSemester(courses ?? []);
+  const header = (
+    <PageHeader
+      icon={Library}
+      title="My Courses"
+      subtitle={user?.school ?? "Everything you are studying, by level and semester."}
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setIsImporting((open) => !open);
+              setAdding(null);
+            }}
+            className="btn-secondary"
+          >
+            <FileUp className="h-4 w-4" aria-hidden /> Import from file
+          </button>
+          <button
+            type="button"
+            data-tour="courses-add"
+            onClick={() => {
+              setAdding((open) => (open ? null : { semester: user?.semester ?? 1 }));
+              setIsImporting(false);
+            }}
+            className="btn-primary"
+          >
+            <Plus className="h-4 w-4" aria-hidden /> Add courses
+          </button>
+        </>
+      }
+    />
+  );
 
   return (
     <>
-      <PageHeader
-        icon={Library}
-        title="My Courses"
-        subtitle={user?.school ?? "Everything you are studying, by level and semester."}
-        actions={
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setIsImporting((prev) => !prev);
-                setIsAdding(false);
-              }}
-              className="btn-secondary"
-            >
-              <FileUp className="h-4 w-4" aria-hidden /> Import from file
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding((prev) => !prev);
-                setIsImporting(false);
-              }}
-              className="btn-primary"
-            >
-              {isAdding ? <X className="h-4 w-4" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-              {isAdding ? "Cancel" : "Add course"}
-            </button>
-          </>
-        }
-      />
+      {header}
 
-      {isAdding && (
-        <form onSubmit={handleAdd} className="card mb-5 grid animate-fade-in gap-3 p-4 sm:grid-cols-[8rem_1fr_7rem_7rem_auto] sm:items-end">
-          <label>
-            <span className="label">Code</span>
-            <input required value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS302" className="input mt-1" />
-          </label>
-          <label>
-            <span className="label">Course name</span>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Database Systems"
-              className="input mt-1"
-            />
-          </label>
-          <label>
-            <span className="label">Level</span>
-            <select value={level} onChange={(e) => setLevel(Number(e.target.value))} className="input mt-1">
-              {LEVELS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="label">Semester</span>
-            <select value={semester} onChange={(e) => setSemester(Number(e.target.value))} className="input mt-1">
-              <option value={1}>1</option>
-              <option value={2}>2</option>
-            </select>
-          </label>
-          <button type="submit" className="btn-primary">
-            Save
+      {/* Phones have no sidebar, so the levels are chips here. */}
+      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 md:hidden" data-tour="courses-levels">
+        {shownLevels.map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => showLevel(value)}
+            aria-pressed={value === level}
+            className={[
+              "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition",
+              value === level ? "bg-navy text-gold" : "bg-ink/5 text-ink/70",
+            ].join(" ")}
+          >
+            Level {value}
           </button>
-        </form>
-      )}
+        ))}
+        {nextLevel <= HIGHEST_LEVEL && (
+          <button
+            type="button"
+            onClick={() => showLevel(nextLevel)}
+            className="shrink-0 rounded-full border border-dashed border-ink/25 px-3.5 py-1.5 text-sm font-semibold text-ink/60"
+          >
+            + Level {nextLevel}
+          </button>
+        )}
+      </div>
 
-      {isImporting && (
-        <CourseImport
-          onCancel={() => setIsImporting(false)}
-          onDone={async (added) => {
-            setIsImporting(false);
-            setNotice(added ? `Added ${added} course${added === 1 ? "" : "s"}.` : "Those courses were already in your list.");
-            setCourses(await listCourses());
+      {adding && (
+        <AddCoursesForm
+          level={level}
+          semester={adding.semester}
+          onClose={() => setAdding(null)}
+          onAdded={async (added, skipped, addedTo) => {
+            setAdding(null);
+            await refreshCourses();
+            toast(
+              `Added ${added} course${added === 1 ? "" : "s"}${skipped ? `; ${skipped} ${skipped === 1 ? "was" : "were"} already in your list` : ""}.`,
+            );
+            if (addedTo !== level) showLevel(addedTo);
           }}
         />
       )}
 
-      {notice && (
-        <div className="mb-4">
-          <Alert kind="success">{notice}</Alert>
-        </div>
+      {isImporting && (
+        <CourseImport
+          defaultLevel={level}
+          onCancel={() => setIsImporting(false)}
+          onDone={async (added) => {
+            setIsImporting(false);
+            await refreshCourses();
+            toast(added ? `Added ${added} course${added === 1 ? "" : "s"}.` : "Those courses were already in your list.");
+          }}
+        />
       )}
 
       {error && (
@@ -144,14 +154,14 @@ export default function MyCourses() {
 
       {courses === null && <ListSkeleton grid rows={3} />}
 
-      {courses?.length === 0 && !isAdding && !isImporting && (
+      {courses?.length === 0 && !adding && !isImporting && (
         <EmptyState
           icon={Library}
           title="No courses yet"
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" onClick={() => setIsAdding(true)} className="btn-primary">
-                <Plus className="h-4 w-4" aria-hidden /> Add your first course
+              <button type="button" onClick={() => setAdding({ semester: user?.semester ?? 1 })} className="btn-primary">
+                <Plus className="h-4 w-4" aria-hidden /> Add your courses
               </button>
               <button type="button" onClick={() => setIsImporting(true)} className="btn-secondary">
                 <FileUp className="h-4 w-4" aria-hidden /> Import from a photo or PDF
@@ -159,21 +169,78 @@ export default function MyCourses() {
             </div>
           }
         >
-          Add your courses by hand, or import them from your registration slip or course list. Then upload slides,
-          PDFs or notes to start revising.
+          Add this semester's courses by hand, several at once, or import them from your registration slip. Then
+          upload slides, PDFs or notes to start revising.
         </EmptyState>
       )}
 
-      {groups.map((group) => (
-        <section key={group.key} className="mb-6">
-          <h2 className="section-title">{group.label}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.courses.map((course) => (
-              <CourseCard key={course.id} course={course} to={`/courses/${course.id}`} />
-            ))}
+      {courses && courses.length > 0 && (
+        <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-ink">
+              Level {level}
+              {level === user?.level && (
+                <span className="ml-2 rounded-full bg-gold/20 px-2 py-0.5 align-middle text-xs font-semibold text-ink/70">
+                  Current level
+                </span>
+              )}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {level !== user?.level && (
+                <button type="button" onClick={() => void makeCurrent()} className="btn-ghost text-sm text-gold-dark">
+                  <ArrowUpCircle className="h-4 w-4" aria-hidden /> Make this my current level
+                </button>
+              )}
+              {nextLevel <= HIGHEST_LEVEL && level === Math.max(...shownLevels) && (
+                <button type="button" onClick={() => showLevel(nextLevel)} className="hidden text-sm md:inline-flex btn-ghost">
+                  <Plus className="h-4 w-4" aria-hidden /> Start Level {nextLevel}
+                </button>
+              )}
+            </div>
           </div>
-        </section>
-      ))}
+
+          {[1, 2].map((semester) => {
+            const list = inLevel.filter((course) => course.semester === semester);
+            return (
+              <section key={semester} className="mb-6" data-tour={semester === 1 ? "courses-semester" : undefined}>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="section-title mb-0">Semester {semester}</h3>
+                  {list.length > 0 && (
+                    <button type="button" onClick={() => setAdding({ semester })} className="btn-ghost px-2 py-1 text-xs text-gold-dark">
+                      <Plus className="h-3.5 w-3.5" aria-hidden /> Add
+                    </button>
+                  )}
+                </div>
+                {list.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAdding({ semester })}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink/15 px-4 py-6 text-sm font-semibold text-ink/55 transition hover:border-gold/60 hover:bg-gold/5"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden /> Add Semester {semester} courses
+                  </button>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {list.map((course) => (
+                      <CourseCard key={course.id} course={course} to={`/courses/${course.id}`} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+          {inLevel.length === 0 && (
+            <p className="text-sm text-ink/60">
+              Starting Level {level}? Add its courses above. Your earlier levels stay in{" "}
+              <Link to="/courses" className="font-semibold text-gold-dark">
+                My Courses
+              </Link>{" "}
+              with everything you uploaded.
+            </p>
+          )}
+        </>
+      )}
     </>
   );
 }
