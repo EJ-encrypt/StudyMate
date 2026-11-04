@@ -13,6 +13,7 @@ from app.api.routers import (
     notifications,
     profile,
     schedule,
+    social,
 )
 from app.core.config import settings
 
@@ -58,6 +59,7 @@ app.include_router(notifications.router)
 app.include_router(notifications.jobs_router)
 app.include_router(notifications.cron_router)
 app.include_router(games.router)
+app.include_router(social.router)
 app.include_router(documents.storage_router)
 
 

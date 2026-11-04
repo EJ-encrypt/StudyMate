@@ -391,10 +391,7 @@ def _match_course(client: TestClient, db: Session, email: str, count: int):
 def _play(client: TestClient, headers: dict, course_id: str, document_id: str | None = None) -> dict:
     params = {"document_id": document_id} if document_id else {}
     round_ = client.get(f"/games/{course_id}/concept-match", headers=headers, params=params).json()
-    client.post("/games/concept-match", headers=headers, json={
-        "course_id": course_id, "concept_ids": [p["concept_id"] for p in round_["pairs"]],
-        "mistakes": 0, "duration_ms": 20_000,
-    })
+    client.post(f"/games/rounds/{round_['round_id']}/submit", headers=headers, json={"mistakes": 0, "duration_ms": 20_000})
     return round_
 
 

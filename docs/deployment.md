@@ -240,6 +240,21 @@ once. Mistral takes over when it runs out; Mistral's own free plan allows
 about one request per second, which is enough for a handful of testers at a
 time.
 
+## Updating the live app
+
+After code changes are committed, one command updates the database and
+redeploys. From the `StudyMate` folder:
+
+```bash
+backend\.venv\Scripts\python scripts\release.py
+```
+
+It applies any new database migrations to Supabase first, then uploads the
+committed code to Vercel, waits for the build, and checks the site answers.
+It needs `DATABASE_URL` (session pooler) and `VERCEL_TOKEN` in `.env`, and
+deploys only what is committed. If the database step fails, nothing is
+deployed.
+
 ## Running locally (optional)
 
 Only needed to develop, not to use the app. It needs about 2GB of free memory.

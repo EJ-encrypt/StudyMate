@@ -1,78 +1,64 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.assessment import NewBadge
 
 
-class ClockQuestionRead(BaseModel):
-    item_id: uuid.UUID
-    kind: str
-    question: str
-    # Four buttons; empty means the answer is typed.
-    options: list[str]
-    # Sent with the round so feedback after each answer is instant. Scoring
-    # does not trust the browser: the server re-marks every response.
-    answer: str
-    explanation: str
+class ChallengeInfo(BaseModel):
+    """Shown while playing a friend's challenge: whose score to beat."""
+
+    id: uuid.UUID
+    challenger_name: str
+    challenger_score: int
 
 
-class ClockRound(BaseModel):
+class RoundRead(BaseModel):
+    """A dealt round of any game.
+
+    The game's own content sits alongside these fields, as stored: for
+    example "questions" for Beat the Clock and Three Strikes, "pairs" for
+    Concept Match, "statements" for True or False Blitz, "puzzles" for Odd One
+    Out. Answers are included so feedback is instant; scoring never trusts
+    the browser and re-marks everything against the stored round.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    round_id: uuid.UUID
+    game: str
     course_id: uuid.UUID
-    seconds_per_question: int
-    questions: list[ClockQuestionRead]
+    # "MATH 223 · Calculus II": what a friend sees, who does not have the course.
+    title: str
     personal_best: int | None
+    challenge: ChallengeInfo | None = None
 
 
-class ClockAnswer(BaseModel):
-    item_id: uuid.UUID
+class RoundAnswer(BaseModel):
+    # The question, statement or puzzle answered: an item id, a statement key,
+    # or a puzzle's position.
+    key: str = Field(max_length=200)
     response: str = Field(max_length=500)
     time_ms: int = Field(ge=0, le=600_000)
 
 
-class ClockSubmit(BaseModel):
-    course_id: uuid.UUID
-    answers: list[ClockAnswer] = Field(min_length=1, max_length=20)
+class RoundSubmit(BaseModel):
+    answers: list[RoundAnswer] = Field(default=[], max_length=100)
+    # Concept Match only: wrong pairs, and how long the whole board took.
+    mistakes: int = Field(default=0, ge=0, le=500)
+    duration_ms: int = Field(default=0, ge=0, le=3_600_000)
 
 
-class ClockAnswerResult(BaseModel):
-    item_id: uuid.UUID
+class AnswerResult(BaseModel):
+    key: str
     correct: bool
     points: int
 
 
-class MatchPairRead(BaseModel):
-    concept_id: uuid.UUID
-    name: str
-    clue: str
-
-
-class MatchRound(BaseModel):
-    course_id: uuid.UUID
-    # Set when the round was drawn from one file rather than the whole course.
-    document_id: uuid.UUID | None = None
-    pairs: list[MatchPairRead]
-    personal_best: int | None
-    # How fresh this round is, so the page can say when the material is
-    # running out of new pairs and suggest uploading more.
-    pool_size: int = 0
-    fresh_in_round: int = 0
-    fresh_rounds_left: int = 0
-    rounds_played: int = 0
-    # "fresh", "mixing" or "repeating".
-    variety: str = "fresh"
-
-
-class MatchSubmit(BaseModel):
-    course_id: uuid.UUID
-    concept_ids: list[uuid.UUID] = Field(min_length=1, max_length=12)
-    mistakes: int = Field(ge=0, le=500)
-    duration_ms: int = Field(ge=0, le=3_600_000)
-
-
 class GameResult(BaseModel):
     game: str
+    round_id: uuid.UUID | None = None
     score: int
     correct: int
     total: int
@@ -80,7 +66,7 @@ class GameResult(BaseModel):
     personal_best: int
     is_personal_best: bool
     new_badges: list[NewBadge] = []
-    answers: list[ClockAnswerResult] = []
+    answers: list[AnswerResult] = []
 
 
 class GameStats(BaseModel):

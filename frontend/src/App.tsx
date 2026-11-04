@@ -10,8 +10,10 @@ import Coach from "./pages/Coach";
 import ConceptDetail from "./pages/ConceptDetail";
 import ConceptMatch from "./pages/ConceptMatch";
 import CourseDetail from "./pages/CourseDetail";
+import Friends from "./pages/Friends";
 import Login from "./pages/Login";
 import MyCourses from "./pages/MyCourses";
+import OddOneOut from "./pages/OddOneOut";
 import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
 import Quiz from "./pages/Quiz";
@@ -22,6 +24,8 @@ import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import StudyEngine from "./pages/StudyEngine";
 import StudyCourse from "./pages/StudyCourse";
+import ThreeStrikes from "./pages/ThreeStrikes";
+import TrueFalse from "./pages/TrueFalse";
 
 /** Sends a signed-in student who has not set their school through onboarding. */
 function RequireOnboarding() {
@@ -61,6 +65,10 @@ export default function App() {
               <Route path="/play" element={<Arcade />} />
               <Route path="/play/:courseId/clock" element={<BeatTheClock />} />
               <Route path="/play/:courseId/match" element={<ConceptMatch />} />
+              <Route path="/play/:courseId/blitz" element={<TrueFalse />} />
+              <Route path="/play/:courseId/odd" element={<OddOneOut />} />
+              <Route path="/play/:courseId/strikes" element={<ThreeStrikes />} />
+              <Route path="/friends" element={<Friends />} />
               <Route path="/schedule" element={<Schedule />} />
               <Route path="/lectures/:slotId/reflect" element={<Reflect />} />
               <Route path="/coach" element={<Coach />} />

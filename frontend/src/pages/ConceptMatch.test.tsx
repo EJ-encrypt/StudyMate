@@ -7,6 +7,10 @@ import ConceptMatch from "./ConceptMatch";
 const submitConceptMatch = vi.fn();
 const startConceptMatch = vi.fn();
 const ROUND = {
+    round_id: "round-1",
+    game: "concept_match",
+    title: "CS1 · Systems",
+    challenge: null,
     course_id: "course-1",
     document_id: null,
     pool_size: 2,
@@ -22,8 +26,10 @@ const ROUND = {
 };
 
 vi.mock("../api/games", () => ({
-  startConceptMatch: (...args: unknown[]) => startConceptMatch(...args),
-  submitConceptMatch: (...args: unknown[]) => submitConceptMatch(...args),
+  startRound: (...args: unknown[]) => startConceptMatch(...args),
+  submitRound: (...args: unknown[]) => submitConceptMatch(...args),
+  startChallengeRound: vi.fn(),
+  submitChallenge: vi.fn(),
 }));
 
 function renderGame() {
@@ -54,6 +60,7 @@ describe("Concept Match", () => {
       is_personal_best: true,
       new_badges: [],
       answers: [],
+      round_id: "round-1",
     });
   });
 
@@ -115,10 +122,10 @@ describe("Concept Match", () => {
     fireEvent.click(meaning("Memory"));
 
     await waitFor(() => expect(submitConceptMatch).toHaveBeenCalledTimes(1));
-    const [courseId, conceptIds, mistakes] = submitConceptMatch.mock.calls[0];
-    expect(courseId).toBe("course-1");
-    expect(conceptIds).toEqual(["c1", "c2"]);
-    expect(mistakes).toBe(1);
+    const [roundId, submission] = submitConceptMatch.mock.calls[0];
+    expect(roundId).toBe("round-1");
+    expect(submission.mistakes).toBe(1);
+    expect(submission.duration_ms).toBeGreaterThanOrEqual(0);
     expect(await screen.findByText("New personal best!")).toBeInTheDocument();
   });
 });

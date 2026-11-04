@@ -50,14 +50,65 @@ export function EmptyState({
   );
 }
 
-export function StatTile({ label, value, icon: Icon }: { label: string; value: ReactNode; icon?: LucideIcon }) {
+export type StatTone = "plain" | "fire" | "amber" | "violet" | "sky";
+
+// A tinted tile, a coloured label, and an icon badge per tone. Dark mode
+// swaps the pale tints for deep ones (index.css).
+const TONES: Record<StatTone, { tile: string; label: string; badge: string; icon: string }> = {
+  plain: { tile: "card", label: "text-ink/55", badge: "", icon: "" },
+  fire: {
+    tile: "rounded-xl border border-red-200 bg-red-50 shadow-card",
+    label: "text-red-700",
+    badge: "bg-gradient-to-br from-amber-100 to-red-100",
+    // Filled orange inside a red outline: reads as a flame, not a line drawing.
+    icon: "fill-orange-400 text-red-500",
+  },
+  amber: {
+    tile: "rounded-xl border border-amber-200 bg-amber-50 shadow-card",
+    label: "text-amber-700",
+    badge: "bg-amber-100",
+    icon: "fill-amber-300 text-amber-600",
+  },
+  violet: {
+    tile: "rounded-xl border border-violet-200 bg-violet-50 shadow-card",
+    label: "text-violet-700",
+    badge: "bg-violet-100",
+    icon: "fill-violet-200 text-violet-600",
+  },
+  sky: {
+    tile: "rounded-xl border border-sky-200 bg-sky-50 shadow-card",
+    label: "text-sky-700",
+    badge: "bg-sky-100",
+    icon: "text-sky-600",
+  },
+};
+
+export function StatTile({
+  label,
+  value,
+  icon: Icon,
+  tone = "plain",
+}: {
+  label: string;
+  value: ReactNode;
+  icon?: LucideIcon;
+  tone?: StatTone;
+}) {
+  const style = TONES[tone];
   return (
-    <div className="card p-3">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-ink/55">
-        {Icon && <Icon className="h-3.5 w-3.5" aria-hidden />}
+    <div className={`${style.tile} p-3`}>
+      <div className={`flex items-center gap-1.5 text-xs font-semibold ${style.label}`}>
+        {Icon &&
+          (tone === "plain" ? (
+            <Icon className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full ${style.badge}`}>
+              <Icon className={`h-4 w-4 ${style.icon}`} aria-hidden />
+            </span>
+          ))}
         {label}
       </div>
-      <p className="mt-1 text-2xl font-bold tracking-tight text-ink">{value}</p>
+      <p className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums text-ink">{value}</p>
     </div>
   );
 }

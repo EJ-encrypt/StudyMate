@@ -1,9 +1,9 @@
 import { ArrowLeft, CheckCircle2, Link2, Repeat, Sparkles, Timer, UploadCloud, XCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
-import { errorMessage } from "../api/client";
-import { GameResult, MatchPair, MatchRound, startConceptMatch, submitConceptMatch } from "../api/games";
+import { MatchPair, MatchRound } from "../api/games";
+import { useArcadeRound } from "../lib/useArcadeRound";
 import GameResultCard from "../components/GameResultCard";
 import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
@@ -79,44 +79,30 @@ function VarietyNote({ round, courseId }: { round: MatchRound; courseId: string 
 }
 
 export default function ConceptMatch() {
-  const { courseId } = useParams<{ courseId: string }>();
-  const [params] = useSearchParams();
-  const documentId = params.get("document");
-  const [round, setRound] = useState<MatchRound | null>(null);
+  const { round, result, error, isSubmitting, load, submit, backTo } = useArcadeRound<MatchRound>("concept-match");
   // Each column is shuffled on its own, so a concept is rarely level with its meaning.
-  const [names, setNames] = useState<MatchPair[]>([]);
-  const [clues, setClues] = useState<MatchPair[]>([]);
+  const names = useMemo<MatchPair[]>(() => (round ? shuffle(round.pairs) : []), [round]);
+  const clues = useMemo<MatchPair[]>(() => (round ? shuffle(round.pairs) : []), [round]);
   const [selected, setSelected] = useState<Pick | null>(null);
   const [matched, setMatched] = useState<Set<string>>(new Set());
   const [wrong, setWrong] = useState<Pick[]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [result, setResult] = useState<GameResult | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const startedAt = useRef<number | null>(null);
 
-  const load = useCallback(() => {
-    if (!courseId) return;
-    setRound(null);
-    setResult(null);
-    setError(null);
+  // A new round (first load, or "Play again") deals a fresh board. Reset while
+  // rendering rather than in an effect, so a tap in the instant after the
+  // cards appear cannot be wiped out by a reset that runs a moment later.
+  const [boardFor, setBoardFor] = useState<string | null>(null);
+  if (round && round.round_id !== boardFor) {
+    setBoardFor(round.round_id);
     setSelected(null);
     setMatched(new Set());
     setWrong([]);
     setMistakes(0);
     setElapsed(0);
     startedAt.current = null;
-    startConceptMatch(courseId, documentId)
-      .then((data) => {
-        setRound(data);
-        setNames(shuffle(data.pairs));
-        setClues(shuffle(data.pairs));
-      })
-      .catch((err) => setError(errorMessage(err, "Could not start a round.")));
-  }, [courseId, documentId]);
-
-  useEffect(load, [load]);
+  }
 
   const finished = round !== null && matched.size === round.pairs.length;
 
@@ -128,19 +114,10 @@ export default function ConceptMatch() {
   }, [selected, finished]);
 
   useEffect(() => {
-    if (!finished || !round || !courseId || result || isSubmitting) return;
+    if (!finished || !round || result || isSubmitting) return;
     const duration = Math.round(performance.now() - (startedAt.current ?? performance.now()));
     setElapsed(duration);
-    setIsSubmitting(true);
-    submitConceptMatch(
-      courseId,
-      round.pairs.map((p) => p.concept_id),
-      mistakes,
-      duration,
-    )
-      .then(setResult)
-      .catch((err) => setError(errorMessage(err, "Could not save your score.")))
-      .finally(() => setIsSubmitting(false));
+    void submit({ mistakes, duration_ms: duration });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
@@ -173,7 +150,7 @@ export default function ConceptMatch() {
     return (
       <div className="mx-auto max-w-md space-y-3">
         <Alert>{error}</Alert>
-        <Link to={`/play?course=${courseId}`} className="btn-secondary">
+        <Link to={backTo} className="btn-secondary">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Back to the Arcade
         </Link>
       </div>
@@ -185,7 +162,8 @@ export default function ConceptMatch() {
     return (
       <GameResultCard
         result={result}
-        courseId={round.course_id}
+        backTo={backTo}
+        challenge={round.challenge}
         onPlayAgain={load}
         detail={
           <p className="text-sm text-ink/60">
@@ -252,7 +230,13 @@ export default function ConceptMatch() {
         </div>
       </div>
 
-      <VarietyNote round={round} courseId={round.course_id} />
+      {round.challenge ? (
+        <p className="mb-4 rounded-lg bg-gold/15 px-3 py-2 text-sm font-semibold text-ink">
+          Beat {round.challenge.challenger_name}: {round.challenge.challenger_score.toLocaleString()}
+        </p>
+      ) : (
+        <VarietyNote round={round} courseId={round.course_id} />
+      )}
 
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 sm:gap-4">
         <section aria-label="Concepts">

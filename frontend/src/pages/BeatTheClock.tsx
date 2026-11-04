@@ -1,10 +1,10 @@
-import { ArrowLeft, CheckCircle2, Flame, Timer, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Flame, Swords, Timer, XCircle } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-import { errorMessage } from "../api/client";
-import { ClockRound, GameResult, startBeatTheClock, submitBeatTheClock } from "../api/games";
+import { ClockRound } from "../api/games";
 import GameResultCard from "../components/GameResultCard";
+import { useArcadeRound } from "../lib/useArcadeRound";
 import MathText from "../components/MathText";
 import { Alert, Spinner } from "../components/ui";
 
@@ -38,8 +38,7 @@ function points(timeMs: number, limitMs: number, streak: number): number {
 }
 
 export default function BeatTheClock() {
-  const { courseId } = useParams<{ courseId: string }>();
-  const [round, setRound] = useState<ClockRound | null>(null);
+  const { round, result, error, load, submit, backTo } = useArcadeRound<ClockRound>("beat-the-clock");
   const [phase, setPhase] = useState<Phase>("loading");
   const [countdown, setCountdown] = useState(3);
   const [index, setIndex] = useState(0);
@@ -48,8 +47,6 @@ export default function BeatTheClock() {
   const [remainingMs, setRemainingMs] = useState(0);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [result, setResult] = useState<GameResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const startedAt = useRef(0);
   const answeredRef = useRef(false);
 
@@ -57,24 +54,19 @@ export default function BeatTheClock() {
   const question = round?.questions[index];
   const lastAnswer = answers[answers.length - 1];
 
-  const load = useCallback(() => {
-    if (!courseId) return;
-    setPhase("loading");
-    setError(null);
-    setResult(null);
+  // A new round (first load, or "Play again") starts from the top. Reset while
+  // rendering rather than in an effect, so a tap on Start the instant it
+  // appears is not undone by a reset that runs a moment later.
+  const [roundFor, setRoundFor] = useState<string | null>(null);
+  if (round && round.round_id !== roundFor) {
+    setRoundFor(round.round_id);
     setAnswers([]);
     setIndex(0);
     setScore(0);
     setStreak(0);
-    startBeatTheClock(courseId)
-      .then((data) => {
-        setRound(data);
-        setPhase("ready");
-      })
-      .catch((err) => setError(errorMessage(err, "Could not start a round.")));
-  }, [courseId]);
-
-  useEffect(load, [load]);
+    setPhase("ready");
+  }
+  if (!round && phase !== "loading") setPhase("loading");
 
   // 3-2-1 before the first question.
   useEffect(() => {
@@ -124,25 +116,16 @@ export default function BeatTheClock() {
 
   // After feedback, the next question or the end of the round.
   useEffect(() => {
-    if (phase !== "feedback" || !round || !courseId) return;
+    if (phase !== "feedback" || !round) return;
     const timer = setTimeout(() => {
       if (index + 1 < round.questions.length) {
         setIndex((i) => i + 1);
         beginQuestion();
       } else {
         setPhase("submitting");
-        submitBeatTheClock(
-          courseId,
-          answers.map(({ item_id, response, time_ms }) => ({ item_id, response, time_ms })),
-        )
-          .then((data) => {
-            setResult(data);
-            setPhase("done");
-          })
-          .catch((err) => {
-            setError(errorMessage(err, "Could not save your score."));
-            setPhase("done");
-          });
+        void submit({
+          answers: answers.map(({ item_id, response, time_ms }) => ({ key: item_id, response, time_ms })),
+        }).finally(() => setPhase("done"));
       }
     }, FEEDBACK_MS);
     return () => clearTimeout(timer);
@@ -158,7 +141,7 @@ export default function BeatTheClock() {
     return (
       <div className="mx-auto max-w-md space-y-3">
         <Alert>{error}</Alert>
-        <Link to={`/play?course=${courseId}`} className="btn-secondary">
+        <Link to={backTo} className="btn-secondary">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Back to the Arcade
         </Link>
       </div>
@@ -170,7 +153,8 @@ export default function BeatTheClock() {
     return result ? (
       <GameResultCard
         result={result}
-        courseId={round.course_id}
+        backTo={backTo}
+        challenge={round.challenge}
         onPlayAgain={load}
         detail={
           <ul className="space-y-1.5 text-left">
@@ -226,8 +210,15 @@ export default function BeatTheClock() {
               <p className="text-sm text-ink/70">
                 Answer fast for bonus points. Get several right in a row to multiply your score.
               </p>
-              {round.personal_best !== null && (
-                <p className="text-xs text-ink/50">Your best: {round.personal_best.toLocaleString()}</p>
+              {round.challenge ? (
+                <p className="flex items-center justify-center gap-1.5 rounded-lg bg-gold/15 px-3 py-2 text-sm font-semibold text-ink">
+                  <Swords className="h-4 w-4 text-gold-dark" aria-hidden />
+                  Beat {round.challenge.challenger_name}: {round.challenge.challenger_score.toLocaleString()}
+                </p>
+              ) : (
+                round.personal_best !== null && (
+                  <p className="text-xs text-ink/50">Your best: {round.personal_best.toLocaleString()}</p>
+                )
               )}
               <button
                 type="button"

@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   Sun,
   Trash2,
+  Trophy,
   UserRound,
 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 
 import { updatePreferences } from "../api/auth";
 import { errorMessage } from "../api/client";
+import { getProgrammes } from "../api/social";
 import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
 import { Alert } from "../components/ui";
@@ -77,6 +79,8 @@ function ProfileForm() {
   const { user, refresh } = useAuth();
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
+  const [programme, setProgramme] = useState(user?.programme ?? "");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [level, setLevel] = useState(user?.level ?? 100);
   const [semester, setSemester] = useState(user?.semester ?? 1);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -85,6 +89,7 @@ function ProfileForm() {
   useEffect(() => {
     setFullName(user?.full_name ?? "");
     setUsername(user?.username ?? "");
+    setProgramme(user?.programme ?? "");
     setLevel(user?.level ?? 100);
     setSemester(user?.semester ?? 1);
   }, [user]);
@@ -94,7 +99,13 @@ function ProfileForm() {
     setIsSaving(true);
     setMessage(null);
     try {
-      await updatePreferences({ full_name: fullName.trim(), username: username.trim(), level, semester });
+      await updatePreferences({
+        full_name: fullName.trim(),
+        username: username.trim(),
+        level,
+        semester,
+        ...(programme.trim() ? { programme: programme.trim() } : {}),
+      });
       await refresh();
       setMessage({ kind: "success", text: "Saved." });
     } catch (err) {
@@ -125,6 +136,24 @@ function ProfileForm() {
             className="input pl-7"
           />
         </div>
+      </label>
+      <label className="sm:col-span-2">
+        <span className="label">Programme</span>
+        <input
+          value={programme}
+          onChange={(e) => setProgramme(e.target.value)}
+          onFocus={() => {
+            if (suggestions.length === 0) getProgrammes().then(setSuggestions).catch(() => undefined);
+          }}
+          list="programme-suggestions"
+          placeholder="BSc Information Technology"
+          className="input mt-1"
+        />
+        <datalist id="programme-suggestions">
+          {suggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </label>
       <label>
         <span className="label">Current level</span>
@@ -243,6 +272,54 @@ function PasswordForm() {
   );
 }
 
+function LeaderboardSetting() {
+  const { user, refresh } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const joined = !!user?.public_leaderboard;
+
+  async function toggle() {
+    setIsSaving(true);
+    try {
+      await updatePreferences({ public_leaderboard: !joined });
+      await refresh();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="card flex items-start justify-between gap-4 p-4">
+      <div>
+        <p className="text-sm font-semibold text-ink">Show me on my programme's leaderboard</p>
+        <p className="mt-0.5 text-xs text-ink/55">
+          Everyone on {user?.programme ?? "your programme"} who joins can see your{" "}
+          {user?.username ? `username (@${user.username})` : "first name and initial"} and XP. Nothing else. Friends always
+          see each other.
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={joined}
+        aria-label="Show me on my programme's leaderboard"
+        disabled={isSaving}
+        onClick={() => void toggle()}
+        className={[
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition",
+          joined ? "bg-navy" : "bg-ink/20",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
+            joined ? "translate-x-5" : "translate-x-0.5",
+          ].join(" ")}
+        />
+      </button>
+    </div>
+  );
+}
+
 function Tutorial() {
   const { refresh } = useAuth();
   const navigate = useNavigate();
@@ -343,6 +420,9 @@ export default function Settings() {
       </Section>
       <Section icon={UserRound} title="Your details">
         <ProfileForm />
+      </Section>
+      <Section icon={Trophy} title="Leaderboards">
+        <LeaderboardSetting />
       </Section>
       <Section icon={BellRing} title="Lecture reminders">
         <NotificationSettings />

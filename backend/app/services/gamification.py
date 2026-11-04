@@ -15,6 +15,7 @@ from app.models.assessment import Assessment, AssessmentKind, Attempt
 from app.models.document import CourseConcept, LectureDocument
 from app.models.gamification import EarnedBadge, StudentProgress
 from app.models.mastery import ConceptMastery
+from app.models.social import XpEvent
 from app.services.coaching import STRONG_THRESHOLD, CONFIDENT_ATTEMPTS
 
 XP_PER_CORRECT_ANSWER = 10
@@ -23,6 +24,7 @@ XP_PER_DOCUMENT = 15
 XP_PER_GAME = 5
 XP_PER_PERSONAL_BEST = 10
 SPEED_DEMON_SCORE = 1500
+SURVIVOR_SCORE = 2000
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,9 @@ BADGES: tuple[Badge, ...] = (
     Badge("speed_demon", "Speed Demon", "Score 1,500 or more in Beat the Clock."),
     Badge("perfect_memory", "Perfect Memory", "Clear Concept Match without a single wrong pair."),
     Badge("reflective", "Reflective Learner", "Write down what you learnt after a lecture."),
+    Badge("survivor", "Survivor", "Score 2,000 or more in Three Strikes."),
+    Badge("first_friend", "Study Buddy", "Add your first friend."),
+    Badge("challenge_won", "Champion", "Win a challenge against a friend."),
 )
 
 BADGES_BY_CODE = {badge.code: badge for badge in BADGES}
@@ -56,6 +61,15 @@ def _progress_for(db: Session, student_id: uuid.UUID) -> StudentProgress:
         progress = StudentProgress(student_id=student_id)
         db.add(progress)
         db.flush()
+    return progress
+
+
+def add_xp(db: Session, student_id: uuid.UUID, amount: int, reason: str) -> StudentProgress:
+    """Credit XP, and log it so leaderboards can count this week as well as all time."""
+    progress = _progress_for(db, student_id)
+    if amount:
+        progress.xp += amount
+        db.add(XpEvent(student_id=student_id, amount=amount, reason=reason))
     return progress
 
 
@@ -86,8 +100,7 @@ def _touch_streak(progress: StudentProgress, today: date) -> None:
 
 
 def record_document_processed(db: Session, student_id: uuid.UUID) -> None:
-    progress = _progress_for(db, student_id)
-    progress.xp += XP_PER_DOCUMENT
+    add_xp(db, student_id, XP_PER_DOCUMENT, "upload")
     earned: list[Badge] = []
     _award(db, student_id, "first_upload", earned)
 
@@ -101,8 +114,7 @@ def record_attempt(
     today: date | None = None,
 ) -> list[Badge]:
     """Update XP and streak for a submitted attempt, returning any new badges."""
-    progress = _progress_for(db, student_id)
-    progress.xp += XP_PER_ATTEMPT + correct_count * XP_PER_CORRECT_ANSWER
+    progress = add_xp(db, student_id, XP_PER_ATTEMPT + correct_count * XP_PER_CORRECT_ANSWER, "quiz")
     _touch_streak(progress, today or date.today())
 
     earned: list[Badge] = []
@@ -161,9 +173,8 @@ def record_game(
     games is to get revision done, and a streak that ignored them would push
     students back towards the plainer formats.
     """
-    progress = _progress_for(db, student_id)
     awarded = XP_PER_GAME + xp + (XP_PER_PERSONAL_BEST if is_personal_best else 0)
-    progress.xp += awarded
+    progress = add_xp(db, student_id, awarded, "game")
     _touch_streak(progress, today or date.today())
 
     earned: list[Badge] = []
@@ -172,6 +183,8 @@ def record_game(
         _award(db, student_id, "speed_demon", earned)
     if game == "concept_match" and mistakes == 0:
         _award(db, student_id, "perfect_memory", earned)
+    if game == "three_strikes" and score >= SURVIVOR_SCORE:
+        _award(db, student_id, "survivor", earned)
     if progress.current_streak >= 3:
         _award(db, student_id, "streak_3", earned)
     if progress.current_streak >= 7:

@@ -1,6 +1,7 @@
-"""The Arcade: Beat the Clock and Concept Match.
+"""Building blocks for the Arcade's rounds: question pools, clues, match history.
 
-Both games are built from what the student already has, with no model call:
+Dealing and marking every game lives in app.services.arcade. The games are
+built from what the student already has, with no model call:
 Beat the Clock reuses questions from multiple-choice and fill-in-the-blank
 sets they generated, and Concept Match uses their course knowledge base. A
 round therefore starts instantly, costs nothing against the free-tier quota,
@@ -26,7 +27,6 @@ from app.services.grading import is_correct, normalize
 
 BEAT_THE_CLOCK = "beat_the_clock"
 CONCEPT_MATCH = "concept_match"
-GAMES = (BEAT_THE_CLOCK, CONCEPT_MATCH)
 
 # Beat the Clock
 ROUND_SIZE = 10
@@ -159,36 +159,6 @@ def clock_points(correct: bool, time_ms: int, streak: int) -> int:
     speed_bonus = round(MAX_SPEED_BONUS * remaining / limit_ms)
     multiplier = min(1 + 0.25 * (streak - 1), MAX_STREAK_MULTIPLIER)
     return round((BASE_POINTS + speed_bonus) * multiplier)
-
-
-@dataclass(frozen=True)
-class ClockAnswerResult:
-    item: AssessmentItem
-    response: str
-    correct: bool
-    points: int
-
-
-def score_beat_the_clock(
-    db: Session,
-    student_id: uuid.UUID,
-    course_id: uuid.UUID,
-    answers: list[tuple[uuid.UUID, str, int]],
-) -> list[ClockAnswerResult]:
-    """Mark a finished round. Answers are (item_id, response, time_ms) in play order."""
-    pool = {item.id: item for item in _question_pool(db, student_id, course_id)}
-    unknown = [str(item_id) for item_id, _, _ in answers if item_id not in pool]
-    if unknown:
-        raise ValueError(f"These questions are not from this course: {', '.join(unknown)}")
-
-    results = []
-    streak = 0
-    for item_id, response, time_ms in answers:
-        item = pool[item_id]
-        correct = time_ms <= SECONDS_PER_QUESTION * 1000 and is_correct(item.kind, item.answer, response)
-        streak = streak + 1 if correct else 0
-        results.append(ClockAnswerResult(item, response, correct, clock_points(correct, time_ms, streak)))
-    return results
 
 
 # --- Concept Match ----------------------------------------------------------
@@ -337,23 +307,6 @@ def concept_match_score(pairs: int, mistakes: int, duration_ms: int) -> int:
     par_ms = pairs * PAR_SECONDS_PER_PAIR * 1000
     time_bonus = max(0, (par_ms - max(0, duration_ms)) // 1000) * TIME_BONUS_PER_SECOND
     return max(0, pairs * POINTS_PER_PAIR - mistakes * MISTAKE_PENALTY + time_bonus)
-
-
-def validate_concepts(
-    db: Session, student_id: uuid.UUID, course_id: uuid.UUID, concept_ids: list[uuid.UUID]
-) -> int:
-    found = (
-        db.query(func.count(CourseConcept.id))
-        .filter(
-            CourseConcept.id.in_(concept_ids),
-            CourseConcept.student_id == student_id,
-            CourseConcept.course_id == course_id,
-        )
-        .scalar()
-    )
-    if found != len(set(concept_ids)):
-        raise ValueError("Some of those concepts are not from this course")
-    return found
 
 
 # --- Results ----------------------------------------------------------------

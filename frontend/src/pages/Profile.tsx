@@ -10,12 +10,15 @@ import {
   NotebookPen,
   Rocket,
   Settings,
+  Shield,
   Star,
+  Swords,
   Target,
   Timer,
   Trophy,
   UploadCloud,
   UserCircle,
+  Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -39,6 +42,9 @@ const BADGE_ICONS: Record<string, LucideIcon> = {
   speed_demon: Timer,
   perfect_memory: Zap,
   reflective: NotebookPen,
+  survivor: Shield,
+  first_friend: Users,
+  challenge_won: Swords,
 };
 
 export default function Profile() {
@@ -61,9 +67,14 @@ export default function Profile() {
         title={user?.full_name ?? "Profile"}
         subtitle={[user?.programme, user?.level ? `Level ${user.level}` : null].filter(Boolean).join(" · ") || user?.email}
         actions={
-          <button type="button" onClick={() => void logout()} className="btn-secondary md:hidden">
-            <LogOut className="h-4 w-4" aria-hidden /> Log out
-          </button>
+          <>
+            <Link to="/friends" className="btn-gold">
+              <Users className="h-4 w-4" aria-hidden /> Friends & leaderboard
+            </Link>
+            <button type="button" onClick={() => void logout()} className="btn-secondary md:hidden">
+              <LogOut className="h-4 w-4" aria-hidden /> Log out
+            </button>
+          </>
         }
       />
 
@@ -73,10 +84,10 @@ export default function Profile() {
       {progress && (
         <>
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile icon={Zap} label="XP" value={progress.xp.toLocaleString()} />
-            <StatTile icon={Flame} label="Day streak" value={progress.current_streak} />
-            <StatTile icon={Trophy} label="Best streak" value={progress.longest_streak} />
-            <StatTile icon={BookOpenCheck} label="Quizzes taken" value={progress.attempts} />
+            <StatTile icon={Zap} tone="amber" label="XP" value={progress.xp.toLocaleString()} />
+            <StatTile icon={Flame} tone="fire" label="Day streak" value={progress.current_streak} />
+            <StatTile icon={Trophy} tone="violet" label="Best streak" value={progress.longest_streak} />
+            <StatTile icon={BookOpenCheck} tone="sky" label="Quizzes taken" value={progress.attempts} />
           </section>
 
           <p className="mt-3 text-sm text-ink/60">

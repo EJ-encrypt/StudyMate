@@ -1,7 +1,44 @@
 import { apiClient } from "./client";
 import { NewBadge } from "./assessments";
 
-export type GameName = "beat_the_clock" | "concept_match";
+export type GameName = "beat_the_clock" | "concept_match" | "true_false" | "odd_one_out" | "three_strikes";
+/** How each game appears in URLs: /play/:courseId/:path and /games/:courseId/:slug. */
+export type GameSlug = "beat-the-clock" | "concept-match" | "true-false" | "odd-one-out" | "three-strikes";
+
+export const GAME_SLUGS: Record<GameName, GameSlug> = {
+  beat_the_clock: "beat-the-clock",
+  concept_match: "concept-match",
+  true_false: "true-false",
+  odd_one_out: "odd-one-out",
+  three_strikes: "three-strikes",
+};
+
+/** Page path under /play/:courseId/ for each game. */
+export const GAME_PATHS: Record<GameName, string> = {
+  beat_the_clock: "clock",
+  concept_match: "match",
+  true_false: "blitz",
+  odd_one_out: "odd",
+  three_strikes: "strikes",
+};
+
+export interface ChallengeInfo {
+  id: string;
+  challenger_name: string;
+  challenger_score: number;
+}
+
+/** Fields every dealt round has; each game adds its own content. */
+export interface RoundBase {
+  round_id: string;
+  game: GameName;
+  course_id: string;
+  /** "MATH 223 · Calculus II". */
+  title: string;
+  personal_best: number | null;
+  /** Set when playing a friend's challenge. */
+  challenge: ChallengeInfo | null;
+}
 
 export interface ClockQuestion {
   item_id: string;
@@ -13,11 +50,14 @@ export interface ClockQuestion {
   explanation: string;
 }
 
-export interface ClockRound {
-  course_id: string;
+export interface ClockRound extends RoundBase {
   seconds_per_question: number;
   questions: ClockQuestion[];
-  personal_best: number | null;
+}
+
+export interface StrikesRound extends RoundBase {
+  questions: ClockQuestion[];
+  strikes: number;
 }
 
 export interface MatchPair {
@@ -28,12 +68,10 @@ export interface MatchPair {
 
 export type MatchVariety = "fresh" | "mixing" | "repeating";
 
-export interface MatchRound {
-  course_id: string;
+export interface MatchRound extends RoundBase {
   /** Set when the round came from one file rather than the whole course. */
   document_id: string | null;
   pairs: MatchPair[];
-  personal_best: number | null;
   /** Concepts in the material the round was drawn from. */
   pool_size: number;
   /** Pairs never matched before in a finished round. */
@@ -44,8 +82,54 @@ export interface MatchRound {
   variety: MatchVariety;
 }
 
+export interface Statement {
+  key: string;
+  subject: string;
+  claim: string;
+  is_true: boolean;
+  explanation: string;
+}
+
+export interface BlitzRound extends RoundBase {
+  seconds: number;
+  statements: Statement[];
+}
+
+export interface OddOption {
+  concept_id: string;
+  name: string;
+  summary: string;
+}
+
+export interface OddPuzzle {
+  options: OddOption[];
+  odd_id: string;
+  /** The concept the three that belong are grouped around. */
+  theme: string;
+}
+
+export interface OddRound extends RoundBase {
+  puzzles: OddPuzzle[];
+}
+
+export interface RoundAnswer {
+  /** Item id, statement key or puzzle position. */
+  key: string;
+  response: string;
+  time_ms: number;
+}
+
+export interface RoundSubmission {
+  answers?: RoundAnswer[];
+  /** Concept Match only. */
+  mistakes?: number;
+  duration_ms?: number;
+}
+
 export interface GameResult {
   game: GameName;
+  /** Present for your own rounds, so a friend can be challenged to the same one. */
+  round_id: string | null;
   score: number;
   correct: number;
   total: number;
@@ -53,7 +137,7 @@ export interface GameResult {
   personal_best: number;
   is_personal_best: boolean;
   new_badges: NewBadge[];
-  answers: { item_id: string; correct: boolean; points: number }[];
+  answers: { key: string; correct: boolean; points: number }[];
 }
 
 export interface GameStats {
@@ -77,40 +161,32 @@ export async function getGameStats(courseId: string): Promise<CourseGameStats> {
   return data;
 }
 
-export async function startBeatTheClock(courseId: string): Promise<ClockRound> {
-  const { data } = await apiClient.get<ClockRound>(`/games/${courseId}/beat-the-clock`);
-  return data;
-}
-
-export async function submitBeatTheClock(
+export async function startRound<T extends RoundBase>(
   courseId: string,
-  answers: { item_id: string; response: string; time_ms: number }[],
-): Promise<GameResult> {
-  const { data } = await apiClient.post<GameResult>("/games/beat-the-clock", {
-    course_id: courseId,
-    answers,
-  });
-  return data;
-}
-
-export async function startConceptMatch(courseId: string, documentId?: string | null): Promise<MatchRound> {
-  const { data } = await apiClient.get<MatchRound>(`/games/${courseId}/concept-match`, {
+  slug: GameSlug,
+  documentId?: string | null,
+): Promise<T> {
+  const { data } = await apiClient.get<T>(`/games/${courseId}/${slug}`, {
     params: documentId ? { document_id: documentId } : undefined,
   });
   return data;
 }
 
-export async function submitConceptMatch(
-  courseId: string,
-  conceptIds: string[],
-  mistakes: number,
-  durationMs: number,
-): Promise<GameResult> {
-  const { data } = await apiClient.post<GameResult>("/games/concept-match", {
-    course_id: courseId,
-    concept_ids: conceptIds,
-    mistakes,
-    duration_ms: durationMs,
-  });
+export async function submitRound(roundId: string, submission: RoundSubmission): Promise<GameResult> {
+  const { data } = await apiClient.post<GameResult>(`/games/rounds/${roundId}/submit`, submission);
   return data;
 }
+
+export async function startChallengeRound<T extends RoundBase>(challengeId: string): Promise<T> {
+  const { data } = await apiClient.get<T>(`/challenges/${challengeId}/round`);
+  return data;
+}
+
+export async function submitChallenge(challengeId: string, submission: RoundSubmission): Promise<GameResult> {
+  const { data } = await apiClient.post<GameResult>(`/challenges/${challengeId}/submit`, submission);
+  return data;
+}
+
+// Kept for the existing pages and tests.
+export const startConceptMatch = (courseId: string, documentId?: string | null) =>
+  startRound<MatchRound>(courseId, "concept-match", documentId);

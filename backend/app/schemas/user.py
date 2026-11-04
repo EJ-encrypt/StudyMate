@@ -32,6 +32,7 @@ class UserRead(BaseModel):
     notify_push: bool = True
     notify_email: bool = True
     tutorial_seen: bool = False
+    public_leaderboard: bool = False
 
     @property
     def needs_onboarding(self) -> bool:
@@ -65,6 +66,8 @@ class PreferencesUpdate(BaseModel):
     notify_push: bool | None = None
     notify_email: bool | None = None
     tutorial_seen: bool | None = None
+    public_leaderboard: bool | None = None
+    programme: str | None = Field(default=None, min_length=1, max_length=150)
 
     @field_validator("username")
     @classmethod

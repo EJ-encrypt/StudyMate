@@ -16,6 +16,8 @@ export interface UserProfile {
   notify_email: boolean;
   /** Whether the first-run walkthrough has been finished or skipped. */
   tutorial_seen: boolean;
+  /** Opted into the programme leaderboard. */
+  public_leaderboard: boolean;
 }
 
 export interface OnboardingDetails {
@@ -33,6 +35,8 @@ export interface Preferences {
   level?: number;
   semester?: number;
   tutorial_seen?: boolean;
+  public_leaderboard?: boolean;
+  programme?: string;
   timezone?: string;
   notify_push?: boolean;
   notify_email?: boolean;

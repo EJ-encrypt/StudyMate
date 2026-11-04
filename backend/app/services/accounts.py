@@ -22,6 +22,7 @@ from app.models.gamification import EarnedBadge, StudentProgress
 from app.models.job import Job
 from app.models.mastery import ConceptMastery
 from app.models.schedule import LectureSlot, PushSubscription, SentReminder
+from app.models.social import Challenge, Friendship, GameRound, XpEvent
 from app.models.user import User
 from app.services.storage import get_storage
 
@@ -51,6 +52,14 @@ def delete_account(db: Session, user: User) -> None:
     gone(db.query(CourseConcept).filter(CourseConcept.student_id == student_id))
     gone(db.query(LectureDocument).filter(LectureDocument.student_id == student_id))
     gone(db.query(GameSession).filter(GameSession.student_id == student_id))
+    gone(db.query(Challenge).filter(
+        (Challenge.challenger_id == student_id) | (Challenge.opponent_id == student_id)
+    ))
+    gone(db.query(GameRound).filter(GameRound.student_id == student_id))
+    gone(db.query(Friendship).filter(
+        (Friendship.requester_id == student_id) | (Friendship.addressee_id == student_id)
+    ))
+    gone(db.query(XpEvent).filter(XpEvent.student_id == student_id))
     gone(db.query(EarnedBadge).filter(EarnedBadge.student_id == student_id))
     gone(db.query(StudentProgress).filter(StudentProgress.student_id == student_id))
     gone(db.query(SentReminder).filter(SentReminder.slot_id.in_(slots.scalar_subquery())))

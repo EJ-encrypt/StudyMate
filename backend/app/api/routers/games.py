@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -6,28 +7,35 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.assessment import AssessmentItem
 from app.models.course import Course
 from app.models.document import CourseConcept, LectureDocument
 from app.models.game import GameSession
+from app.models.social import GameRound
 from app.models.user import User
 from app.schemas.assessment import NewBadge
 from app.schemas.game import (
-    ClockAnswerResult,
-    ClockQuestionRead,
-    ClockRound,
-    ClockSubmit,
+    AnswerResult,
     CourseGameStats,
     GameResult,
     GameStats,
-    MatchPairRead,
-    MatchRound,
-    MatchSubmit,
+    RoundRead,
+    RoundSubmit,
 )
-from app.services import games
+from app.services import arcade, games
 from app.services.coaching import record_answers
 from app.services.gamification import record_game
 
 router = APIRouter(prefix="/games", tags=["games"])
+
+# URL name for each game.
+SLUGS = {
+    "beat-the-clock": arcade.BEAT_THE_CLOCK,
+    "concept-match": arcade.CONCEPT_MATCH,
+    "true-false": arcade.TRUE_FALSE,
+    "odd-one-out": arcade.ODD_ONE_OUT,
+    "three-strikes": arcade.THREE_STRIKES,
+}
 
 
 def _own_course(db: Session, course_id: uuid.UUID, user: User) -> Course:
@@ -37,47 +45,19 @@ def _own_course(db: Session, course_id: uuid.UUID, user: User) -> Course:
     return course
 
 
-def _finish(
-    db: Session,
-    user: User,
-    course_id: uuid.UUID,
-    game: str,
-    score: int,
-    correct: int,
-    total: int,
-    mistakes: int,
-    duration_ms: int,
-    game_xp: int,
-    concept_ids: list[str] | None = None,
-) -> GameResult:
-    previous_best = games.personal_best(db, user.id, course_id, game)
-    is_best = previous_best is None or score > previous_best
-    xp, badges = record_game(db, user.id, game, game_xp, score, mistakes, is_best and previous_best is not None)
+def course_title(course: Course | None) -> str:
+    return f"{course.code} · {course.name}" if course else "A course"
 
-    db.add(
-        GameSession(
-            student_id=user.id,
-            course_id=course_id,
-            game=game,
-            score=score,
-            correct=correct,
-            total=total,
-            mistakes=mistakes,
-            duration_ms=duration_ms,
-            xp_awarded=xp,
-            concept_ids=concept_ids,
-        )
-    )
-    db.commit()
-    return GameResult(
-        game=game,
-        score=score,
-        correct=correct,
-        total=total,
-        xp_awarded=xp,
-        personal_best=max(score, previous_best or 0),
-        is_personal_best=is_best,
-        new_badges=[NewBadge(code=b.code, name=b.name, description=b.description) for b in badges],
+
+def round_view(db: Session, round_: GameRound, personal_best: int | None, challenge=None) -> RoundRead:
+    return RoundRead(
+        **round_.payload,
+        round_id=round_.id,
+        game=round_.game,
+        course_id=round_.course_id,
+        title=course_title(db.get(Course, round_.course_id)),
+        personal_best=personal_best,
+        challenge=challenge,
     )
 
 
@@ -114,7 +94,7 @@ def course_stats(
                 best=rows.get(game, (0, None, None))[1],
                 last_played_at=rows.get(game, (0, None, None))[2],
             )
-            for game in games.GAMES
+            for game in arcade.GAMES
         ],
         clock_questions_available=len(games._question_pool(db, current_user.id, course_id)),
         concepts_available=concepts,
@@ -122,116 +102,103 @@ def course_stats(
     )
 
 
-@router.get("/{course_id}/beat-the-clock", response_model=ClockRound)
-def start_beat_the_clock(
+@router.get("/{course_id}/{slug}", response_model=RoundRead)
+def start_round(
     course_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> ClockRound:
-    _own_course(db, course_id, current_user)
-    try:
-        questions = games.beat_the_clock_round(db, current_user.id, course_id)
-    except games.NotEnoughMaterial as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-    return ClockRound(
-        course_id=course_id,
-        seconds_per_question=games.SECONDS_PER_QUESTION,
-        questions=[ClockQuestionRead(**q.__dict__) for q in questions],
-        personal_best=games.personal_best(db, current_user.id, course_id, games.BEAT_THE_CLOCK),
-    )
-
-
-@router.post("/beat-the-clock", response_model=GameResult, status_code=status.HTTP_201_CREATED)
-def submit_beat_the_clock(
-    payload: ClockSubmit,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> GameResult:
-    _own_course(db, payload.course_id, current_user)
-    try:
-        results = games.score_beat_the_clock(
-            db,
-            current_user.id,
-            payload.course_id,
-            [(a.item_id, a.response, a.time_ms) for a in payload.answers],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    # Game answers are real evidence of what the student knows, so they move
-    # mastery exactly as a quiz answer would.
-    record_answers(db, current_user.id, payload.course_id, [(r.item, r.correct) for r in results])
-
-    correct = sum(1 for r in results if r.correct)
-    result = _finish(
-        db,
-        current_user,
-        payload.course_id,
-        games.BEAT_THE_CLOCK,
-        score=sum(r.points for r in results),
-        correct=correct,
-        total=len(results),
-        mistakes=len(results) - correct,
-        duration_ms=sum(min(a.time_ms, games.SECONDS_PER_QUESTION * 1000) for a in payload.answers),
-        game_xp=correct * 3,
-    )
-    result.answers = [ClockAnswerResult(item_id=r.item.id, correct=r.correct, points=r.points) for r in results]
-    return result
-
-
-@router.get("/{course_id}/concept-match", response_model=MatchRound)
-def start_concept_match(
-    course_id: uuid.UUID,
+    slug: str,
     document_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> MatchRound:
+) -> RoundRead:
+    """Deal a round of any game. The answers come with it, for instant feedback."""
+    game = SLUGS.get(slug)
+    if game is None:
+        raise HTTPException(status_code=404, detail="No such game")
     _own_course(db, course_id, current_user)
     if document_id is not None:
+        if game != arcade.CONCEPT_MATCH:
+            raise HTTPException(status_code=400, detail="Only Concept Match can be played on one file")
         document = db.get(LectureDocument, document_id)
         if document is None or document.student_id != current_user.id or document.course_id != course_id:
             raise HTTPException(status_code=404, detail="File not found in this course")
     try:
-        deal = games.concept_match_round(db, current_user.id, course_id, document_id)
+        round_ = arcade.deal(db, current_user.id, course_id, game, document_id)
     except games.NotEnoughMaterial as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    return MatchRound(
-        course_id=course_id,
-        document_id=document_id,
-        pairs=[MatchPairRead(**p.__dict__) for p in deal.pairs],
-        personal_best=games.personal_best(db, current_user.id, course_id, games.CONCEPT_MATCH),
-        pool_size=deal.pool_size,
-        fresh_in_round=deal.fresh_in_round,
-        fresh_rounds_left=deal.fresh_rounds_left,
-        rounds_played=deal.rounds_played,
-        variety=deal.variety,
-    )
+    return round_view(db, round_, games.personal_best(db, current_user.id, course_id, game))
 
 
-@router.post("/concept-match", response_model=GameResult, status_code=status.HTTP_201_CREATED)
-def submit_concept_match(
-    payload: MatchSubmit,
+def _answers(payload: RoundSubmit) -> list[arcade.Answer]:
+    return [arcade.Answer(a.key, a.response, a.time_ms) for a in payload.answers]
+
+
+@router.post("/rounds/{round_id}/submit", response_model=GameResult, status_code=status.HTTP_201_CREATED)
+def submit_round(
+    round_id: uuid.UUID,
+    payload: RoundSubmit,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> GameResult:
-    _own_course(db, payload.course_id, current_user)
+    round_ = db.get(GameRound, round_id)
+    if round_ is None or round_.student_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Round not found")
+    if round_.submitted_at is not None:
+        raise HTTPException(status_code=409, detail="This round has already been scored")
     try:
-        pairs = games.validate_concepts(db, current_user.id, payload.course_id, payload.concept_ids)
+        marked = arcade.mark(round_.game, round_.payload, _answers(payload), payload.mistakes, payload.duration_ms)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # Matching is recognition, a weaker signal than answering a question, so
-    # it earns XP but deliberately leaves mastery scores alone.
-    return _finish(
-        db,
-        current_user,
-        payload.course_id,
-        games.CONCEPT_MATCH,
-        score=games.concept_match_score(pairs, payload.mistakes, payload.duration_ms),
-        correct=pairs,
-        total=pairs,
-        mistakes=payload.mistakes,
-        duration_ms=payload.duration_ms,
-        game_xp=pairs * 2,
-        concept_ids=[str(concept_id) for concept_id in payload.concept_ids],
+    # Answers to the student's own questions are real evidence of what they
+    # know, so they move mastery exactly as a quiz answer would. Matching and
+    # true-or-false are weaker signals, so those games leave mastery alone.
+    if marked.item_results:
+        items = {
+            item.id: item
+            for item in db.query(AssessmentItem).filter(
+                AssessmentItem.id.in_([item_id for item_id, _ in marked.item_results])
+            )
+        }
+        own = {item.id for item in games._question_pool(db, current_user.id, round_.course_id)}
+        record_answers(
+            db,
+            current_user.id,
+            round_.course_id,
+            [(items[item_id], correct) for item_id, correct in marked.item_results if item_id in own],
+        )
+
+    previous_best = games.personal_best(db, current_user.id, round_.course_id, round_.game)
+    is_best = previous_best is None or marked.score > previous_best
+    xp, badges = record_game(
+        db, current_user.id, round_.game, marked.xp, marked.score, marked.mistakes,
+        is_best and previous_best is not None,
+    )
+    db.add(
+        GameSession(
+            student_id=current_user.id,
+            course_id=round_.course_id,
+            game=round_.game,
+            score=marked.score,
+            correct=marked.correct,
+            total=marked.total,
+            mistakes=marked.mistakes,
+            duration_ms=marked.duration_ms,
+            xp_awarded=xp,
+            concept_ids=arcade.concept_ids(round_.game, round_.payload),
+        )
+    )
+    round_.submitted_at = datetime.now(timezone.utc)
+    round_.score = marked.score
+    db.commit()
+    return GameResult(
+        game=round_.game,
+        round_id=round_.id,
+        score=marked.score,
+        correct=marked.correct,
+        total=marked.total,
+        xp_awarded=xp,
+        personal_best=max(marked.score, previous_best or 0),
+        is_personal_best=is_best,
+        new_badges=[NewBadge(code=b.code, name=b.name, description=b.description) for b in badges],
+        answers=[AnswerResult(key=key, correct=correct, points=points) for key, correct, points in marked.answers],
     )

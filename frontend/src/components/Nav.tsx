@@ -8,6 +8,7 @@ import {
   LucideIcon,
   Settings,
   Dumbbell,
+  Trophy,
   UserCircle,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -31,7 +32,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle },
 ];
 
-/** In the sidebar and the phone header, not the tab bar, which has no room for a seventh tab. */
+/** In the sidebar and the phone header, not the tab bar, which has no room for more tabs. */
+export const FRIENDS_ITEM: NavItem = { to: "/friends", label: "Friends", short: "Friends", icon: Trophy };
 export const SETTINGS_ITEM: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings };
 
 function Brand() {
@@ -65,7 +67,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {[...NAV_ITEMS, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
+          {[...NAV_ITEMS, FRIENDS_ITEM, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -107,9 +109,11 @@ export function MobileHeader() {
         <span className="max-w-[40vw] truncate text-xs text-white/60">
           {user.username ? `@${user.username}` : user.full_name}
         </span>
+        {[FRIENDS_ITEM, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
         <NavLink
-          to={SETTINGS_ITEM.to}
-          aria-label="Settings"
+          key={to}
+          to={to}
+          aria-label={label}
           className={({ isActive }) =>
             [
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
@@ -117,8 +121,9 @@ export function MobileHeader() {
             ].join(" ")
           }
         >
-          <Settings className="h-5 w-5" aria-hidden />
+          <Icon className="h-5 w-5" aria-hidden />
         </NavLink>
+        ))}
       </div>
     </header>
   );
