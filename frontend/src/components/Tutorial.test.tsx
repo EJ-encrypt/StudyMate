@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { NAV_ITEMS } from "./Nav";
 import Tutorial, { STEPS } from "./Tutorial";
 
 const updatePreferences = vi.fn();
@@ -60,5 +61,13 @@ describe("Tutorial", () => {
     renderAt("/courses");
     fireEvent.click(screen.getByRole("button", { name: "Skip the tutorial" }));
     await waitFor(() => expect(updatePreferences).toHaveBeenCalledWith({ tutorial_seen: true }));
+  });
+
+  it("covers every tab, in the order the tabs appear", () => {
+    const firstMention = NAV_ITEMS.map((item) =>
+      STEPS.findIndex((step) => `${step.title} ${step.body}`.includes(item.label)),
+    );
+    firstMention.forEach((index, i) => expect(index, `${NAV_ITEMS[i].label} is not in the tutorial`).toBeGreaterThan(-1));
+    expect(firstMention).toEqual([...firstMention].sort((a, b) => a - b));
   });
 });

@@ -9,6 +9,7 @@ import {
   Library,
   LucideIcon,
   Settings,
+  Trophy,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -26,11 +27,12 @@ interface Step {
   tip?: string;
 }
 
+/** In the same order as the tabs (Nav.tsx), which the test checks. */
 export const STEPS: Step[] = [
   {
     icon: GraduationCap,
     title: "Welcome to StudyMate",
-    body: "StudyMate turns your own lecture slides, PDFs and notes into revision: flashcards, quizzes, games and reminders. Here is how it works, in seven quick steps.",
+    body: "StudyMate turns your own lecture slides, PDFs and notes into revision: flashcards, quizzes, games and reminders. Here is how it works, in eight quick steps.",
   },
   {
     icon: Library,
@@ -39,35 +41,42 @@ export const STEPS: Step[] = [
   },
   {
     icon: UploadCloud,
-    title: "2. Upload your material",
+    title: "2. Add your material",
     body: "Open a course and upload its slides, PDFs or Word documents, type notes, or photograph the pages of notes you wrote in a book. StudyMate reads them, handwriting included, and pulls out the key concepts, usually within a minute or two.",
     tip: "Maths, statistics and economics files are read with their equations intact.",
   },
   {
     icon: Brain,
     title: "3. Revise in the Study Engine",
-    body: "Pick a course and generate flashcards, multiple choice, fill in the blank, short answers or a full exam paper, from one lecture or the whole course.",
-    tip: "Flashcards flip, and mix term-first and definition-first cards so you practise both ways.",
-  },
-  {
-    icon: Gamepad2,
-    title: "4. Play in the Arcade",
-    body: "Five games built from your own material, from Beat the Clock to Three Strikes. They earn XP and badges, and you can challenge friends to beat your score on the Leaderboard.",
-  },
-  {
-    icon: CalendarClock,
-    title: "5. Add your timetable",
-    body: "Enter your lectures, or upload a photo of your timetable. StudyMate reminds you an hour before each lecture and when it starts, then asks what you learnt so it becomes notes.",
+    body: "Pick a course in the Study Engine and generate flashcards, multiple choice, fill in the blank, short answers or a full exam paper, from one lecture or the whole course.",
+    tip: "After turning a flashcard over, tap Still learning or Got it. Cards you know come back days later; the rest come back tomorrow.",
   },
   {
     icon: CoachIcon,
-    title: "6. Follow your Coach",
+    title: "4. Follow your Coach",
     body: "The Coach tracks how well you know every concept from the questions you answer, picks up to five topics to revise next, and tells you when flashcards are due again.",
   },
   {
+    icon: Gamepad2,
+    title: "5. Play in the Arcade",
+    body: "Five games built from your own material, from Beat the Clock to Three Strikes. Each round earns XP, and from the results screen you can challenge a friend to beat your score.",
+  },
+  {
+    icon: Trophy,
+    title: "6. Climb the Leaderboard",
+    body: "On the Leaderboard, add friends by their username, compare XP this week or of all time, and play the challenges friends send you. You can also join the board for everyone on your programme.",
+    tip: "On a phone, Leaderboard and Settings are the icons at the top right. Use the ... beside anyone to report or block them.",
+  },
+  {
+    icon: CalendarClock,
+    title: "7. Add your timetable",
+    body: "In Timetable, enter your lectures or upload a photo of your timetable. StudyMate reminds you an hour before each lecture and when it starts, then asks what you learnt so it becomes notes.",
+    tip: "On an iPhone, first add StudyMate to your Home Screen (Share, then Add to Home Screen): iPhones only send reminders to apps added that way.",
+  },
+  {
     icon: Settings,
-    title: "7. Make it yours",
-    body: "In Settings you can switch between light and dark mode, set a daily study goal, choose how reminders reach you, set a username, and change your password.",
+    title: "8. Track your progress",
+    body: "Profile shows your XP, day streak, badges and today's goal. In Settings you can set that daily goal, switch between light and dark mode, choose how reminders reach you, set a username, and change your password.",
     tip: "You can replay this tutorial from Settings at any time.",
   },
 ];
