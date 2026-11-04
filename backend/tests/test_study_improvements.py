@@ -367,3 +367,79 @@ def test_deleting_an_account_removes_everything(client: TestClient, db: Session)
     db.expire_all()
     assert db.get(User, student_id) is None
     assert db.query(Course).filter(Course.owner_id == student_id).count() == 0
+
+
+# --- Concept Match variety --------------------------------------------------
+
+
+def _match_course(client: TestClient, db: Session, email: str, count: int):
+    headers = auth_headers(email)
+    course = client.post("/courses", json={"code": "CS9", "name": "Systems"}, headers=headers).json()
+    me = client.get("/auth/me", headers=headers).json()
+    concepts = [
+        CourseConcept(
+            student_id=uuid.UUID(me["id"]), course_id=uuid.UUID(course["id"]), name=f"Concept {i}",
+            summary=f"Idea number {i}.", embedding=[0.0], embedding_model="test",
+        )
+        for i in range(count)
+    ]
+    db.add_all(concepts)
+    db.commit()
+    return headers, course["id"], concepts
+
+
+def _play(client: TestClient, headers: dict, course_id: str, document_id: str | None = None) -> dict:
+    params = {"document_id": document_id} if document_id else {}
+    round_ = client.get(f"/games/{course_id}/concept-match", headers=headers, params=params).json()
+    client.post("/games/concept-match", headers=headers, json={
+        "course_id": course_id, "concept_ids": [p["concept_id"] for p in round_["pairs"]],
+        "mistakes": 0, "duration_ms": 20_000,
+    })
+    return round_
+
+
+def test_rounds_use_unseen_concepts_first_and_then_warn_about_repeats(client: TestClient, db: Session) -> None:
+    from app.services import games
+
+    headers, course_id, _ = _match_course(client, db, "variety@example.com", 20)
+    stats = client.get(f"/games/{course_id}/stats", headers=headers).json()
+    assert stats["match_fresh_rounds"] == 20 // games.PAIRS_PER_ROUND
+
+    first = _play(client, headers, course_id)
+    second = _play(client, headers, course_id)
+    assert first["variety"] == second["variety"] == "fresh"
+    # No concept repeats until all have been seen.
+    assert not {p["concept_id"] for p in first["pairs"]} & {p["concept_id"] for p in second["pairs"]}
+
+    third = _play(client, headers, course_id)
+    assert third["variety"] == "mixing"
+    assert third["fresh_in_round"] == 20 - 2 * games.PAIRS_PER_ROUND
+    assert third["fresh_rounds_left"] == 0
+
+    fourth = client.get(f"/games/{course_id}/concept-match", headers=headers).json()
+    assert fourth["variety"] == "repeating"
+    assert fourth["rounds_played"] == 3
+
+
+def test_a_round_can_come_from_one_file(client: TestClient, db: Session) -> None:
+    from app.models.document import KnowledgeConcept
+
+    headers, course_id, concepts = _match_course(client, db, "onefile@example.com", 12)
+    student_id = concepts[0].student_id
+    document = LectureDocument(student_id=student_id, course_id=uuid.UUID(course_id), filename="week1.pdf",
+                               storage_path="x/week1.pdf", status=DocumentStatus.COMPLETED)
+    db.add(document)
+    db.flush()
+    for concept in concepts[:4]:
+        db.add(KnowledgeConcept(document_id=document.id, course_concept_id=concept.id, student_id=student_id,
+                                course_id=uuid.UUID(course_id), name=concept.name, summary=concept.summary))
+    db.commit()
+
+    round_ = client.get(f"/games/{course_id}/concept-match", headers=headers, params={"document_id": str(document.id)}).json()
+
+    assert round_["pool_size"] == 4
+    assert {p["concept_id"] for p in round_["pairs"]} == {str(c.id) for c in concepts[:4]}
+
+    other = client.get(f"/games/{course_id}/concept-match", headers=auth_headers("stranger@example.com"),
+                       params={"document_id": str(document.id)})
+    assert other.status_code == 404

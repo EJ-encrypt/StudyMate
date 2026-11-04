@@ -26,10 +26,22 @@ export interface MatchPair {
   clue: string;
 }
 
+export type MatchVariety = "fresh" | "mixing" | "repeating";
+
 export interface MatchRound {
   course_id: string;
+  /** Set when the round came from one file rather than the whole course. */
+  document_id: string | null;
   pairs: MatchPair[];
   personal_best: number | null;
+  /** Concepts in the material the round was drawn from. */
+  pool_size: number;
+  /** Pairs never matched before in a finished round. */
+  fresh_in_round: number;
+  /** Further rounds possible from concepts never matched. */
+  fresh_rounds_left: number;
+  rounds_played: number;
+  variety: MatchVariety;
 }
 
 export interface GameResult {
@@ -56,6 +68,8 @@ export interface CourseGameStats {
   games: GameStats[];
   clock_questions_available: number;
   concepts_available: number;
+  /** Whole-course Concept Match rounds still possible without repeats. */
+  match_fresh_rounds: number;
 }
 
 export async function getGameStats(courseId: string): Promise<CourseGameStats> {
@@ -79,8 +93,10 @@ export async function submitBeatTheClock(
   return data;
 }
 
-export async function startConceptMatch(courseId: string): Promise<MatchRound> {
-  const { data } = await apiClient.get<MatchRound>(`/games/${courseId}/concept-match`);
+export async function startConceptMatch(courseId: string, documentId?: string | null): Promise<MatchRound> {
+  const { data } = await apiClient.get<MatchRound>(`/games/${courseId}/concept-match`, {
+    params: documentId ? { document_id: documentId } : undefined,
+  });
   return data;
 }
 

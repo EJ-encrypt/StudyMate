@@ -9,7 +9,7 @@ import {
   Library,
   LucideIcon,
   Settings,
-  Target,
+  Dumbbell,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -60,7 +60,7 @@ export const STEPS: Step[] = [
     body: "Enter your lectures, or upload a photo of your timetable. StudyMate reminds you an hour before each lecture and when it starts, then asks what you learnt so it becomes notes.",
   },
   {
-    icon: Target,
+    icon: Dumbbell,
     title: "6. Follow your Coach",
     body: "The Coach tracks how well you know every concept from the questions you answer, and picks up to five topics to revise next.",
   },

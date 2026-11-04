@@ -214,22 +214,123 @@ class MatchPair:
     clue: str
 
 
-def concept_match_round(
-    db: Session, student_id: uuid.UUID, course_id: uuid.UUID, rng: random.Random | None = None
-) -> list[MatchPair]:
-    rng = rng or random.Random()
-    concepts = (
-        db.query(CourseConcept)
-        .filter(CourseConcept.student_id == student_id, CourseConcept.course_id == course_id)
+@dataclass(frozen=True)
+class MatchDeal:
+    """A round of pairs, and how much fresh material is left behind it."""
+
+    pairs: list[MatchPair]
+    # Concepts in the material the round was drawn from.
+    pool_size: int
+    # Pairs in this round never matched before in a finished round.
+    fresh_in_round: int
+    # Concepts still never matched once this round is played.
+    unseen_after: int
+    rounds_played: int
+
+    @property
+    def fresh_rounds_left(self) -> int:
+        """Further rounds that can still be made entirely of unseen concepts."""
+        return self.unseen_after // PAIRS_PER_ROUND
+
+    @property
+    def variety(self) -> str:
+        """'fresh' (all new), 'mixing' (some repeats) or 'repeating' (nothing new)."""
+        if self.fresh_in_round == len(self.pairs):
+            return "fresh"
+        return "mixing" if self.fresh_in_round else "repeating"
+
+
+def _match_pool(
+    db: Session, student_id: uuid.UUID, course_id: uuid.UUID, document_id: uuid.UUID | None
+) -> list[CourseConcept]:
+    """The concepts a round may use: the whole course, or one file's."""
+    query = db.query(CourseConcept).filter(
+        CourseConcept.student_id == student_id, CourseConcept.course_id == course_id
+    )
+    if document_id is not None:
+        from app.models.document import KnowledgeConcept
+
+        query = query.filter(
+            CourseConcept.id.in_(
+                db.query(KnowledgeConcept.course_concept_id).filter(
+                    KnowledgeConcept.document_id == document_id,
+                    KnowledgeConcept.course_concept_id.isnot(None),
+                )
+            )
+        )
+    return query.all()
+
+
+def _match_history(db: Session, student_id: uuid.UUID, course_id: uuid.UUID) -> tuple[dict[str, tuple[int, int]], int]:
+    """How often, and how recently, each concept has been matched in finished rounds.
+
+    Recency is the index of the round (0 = oldest), so a concept matched once
+    long ago sorts ahead of one matched once in the last round.
+    """
+    sessions = (
+        db.query(GameSession.concept_ids)
+        .filter(
+            GameSession.student_id == student_id,
+            GameSession.course_id == course_id,
+            GameSession.game == CONCEPT_MATCH,
+        )
+        .order_by(GameSession.created_at)
         .all()
     )
+    seen: dict[str, tuple[int, int]] = {}
+    for index, (concept_ids,) in enumerate(sessions):
+        for concept_id in concept_ids or []:
+            count, _ = seen.get(concept_id, (0, -1))
+            seen[concept_id] = (count + 1, index)
+    return seen, len(sessions)
+
+
+def concept_match_round(
+    db: Session,
+    student_id: uuid.UUID,
+    course_id: uuid.UUID,
+    document_id: uuid.UUID | None = None,
+    rng: random.Random | None = None,
+) -> MatchDeal:
+    """Deal a round, preferring concepts the student has matched least.
+
+    Never-matched concepts come first; once every concept has been seen, the
+    least-matched and least-recent are used, so repeats are spread evenly
+    rather than the same few pairs coming back. A larger body of material
+    therefore supports many more rounds before anything repeats, which is
+    what the 'variety' on the result reports to the student.
+    """
+    rng = rng or random.Random()
+    concepts = _match_pool(db, student_id, course_id, document_id)
     if len(concepts) < MIN_PAIRS:
+        where = "this file" if document_id else "this course"
         raise NotEnoughMaterial(
-            "Concept Match needs at least three concepts in this course. Upload "
-            "some material and wait for it to finish processing."
+            f"Concept Match needs at least three concepts from {where}. Upload "
+            "more material and wait for it to finish processing."
         )
-    chosen = rng.sample(concepts, min(PAIRS_PER_ROUND, len(concepts)))
-    return [MatchPair(c.id, c.name, make_clue(c.name, c.summary)) for c in chosen]
+
+    seen, rounds_played = _match_history(db, student_id, course_id)
+    rng.shuffle(concepts)
+    concepts.sort(key=lambda c: seen.get(str(c.id), (0, -1)))
+    chosen = concepts[: min(PAIRS_PER_ROUND, len(concepts))]
+    rng.shuffle(chosen)
+
+    unseen = [c for c in concepts if str(c.id) not in seen]
+    fresh = sum(1 for c in chosen if str(c.id) not in seen)
+    return MatchDeal(
+        pairs=[MatchPair(c.id, c.name, make_clue(c.name, c.summary)) for c in chosen],
+        pool_size=len(concepts),
+        fresh_in_round=fresh,
+        unseen_after=len(unseen) - fresh,
+        rounds_played=rounds_played,
+    )
+
+
+def fresh_match_rounds(db: Session, student_id: uuid.UUID, course_id: uuid.UUID) -> int:
+    """Whole-course rounds still possible from concepts never matched."""
+    concepts = _match_pool(db, student_id, course_id, None)
+    seen, _ = _match_history(db, student_id, course_id)
+    return sum(1 for c in concepts if str(c.id) not in seen) // PAIRS_PER_ROUND
 
 
 def concept_match_score(pairs: int, mistakes: int, duration_ms: int) -> int:

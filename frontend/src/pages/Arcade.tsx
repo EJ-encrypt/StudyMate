@@ -1,7 +1,23 @@
-import { Gamepad2, Link2, Lock, Play, Sparkles, Timer, Trophy } from "lucide-react";
+import {
+  CircleX,
+  Flame,
+  Gamepad2,
+  Library,
+  Link2,
+  ListChecks,
+  Lock,
+  LucideIcon,
+  MousePointerClick,
+  Play,
+  Shuffle,
+  Timer,
+  Trophy,
+  Zap,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { DocumentSummary, listDocuments } from "../api/documents";
 import { CourseGameStats, GameName, getGameStats } from "../api/games";
 import CourseSelect from "../components/CourseSelect";
 import PageHeader from "../components/PageHeader";
@@ -12,8 +28,9 @@ interface GameInfo {
   path: string;
   title: string;
   tagline: string;
-  rules: string[];
-  icon: typeof Timer;
+  /** Each rule with an icon that shows what it is about. */
+  rules: [LucideIcon, string][];
+  icon: LucideIcon;
   accent: string;
 }
 
@@ -23,7 +40,11 @@ const GAMES: GameInfo[] = [
     path: "clock",
     title: "Beat the Clock",
     tagline: "Ten questions. Fifteen seconds each. How fast are you?",
-    rules: ["Faster answers score more", "Streaks multiply your points", "Uses your multiple-choice and fill-in-the-blank sets"],
+    rules: [
+      [Zap, "Faster answers score more"],
+      [Flame, "Streaks multiply your points"],
+      [ListChecks, "Uses your multiple-choice and fill-in-the-blank sets"],
+    ],
     icon: Timer,
     accent: "from-navy to-navy-light",
   },
@@ -33,9 +54,9 @@ const GAMES: GameInfo[] = [
     title: "Concept Match",
     tagline: "Concepts on one side, meanings on the other. Pair them all up.",
     rules: [
-      "Tap a concept, then its meaning: green if right, red if not",
-      "Up to eight pairs a round; wrong pairs cost points",
-      "Built from your course knowledge base",
+      [MousePointerClick, "Tap a concept, then its meaning: green if right, red if not"],
+      [CircleX, "Up to eight pairs a round; wrong pairs cost points"],
+      [Shuffle, "Each round brings concepts you have not matched yet"],
     ],
     icon: Link2,
     accent: "from-gold-dark to-gold",
@@ -46,12 +67,19 @@ export default function Arcade() {
   const [params, setParams] = useSearchParams();
   const [courseId, setCourseId] = useState<string | null>(params.get("course"));
   const [stats, setStats] = useState<CourseGameStats | null>(null);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  // Concept Match can be played on the whole course or on one file.
+  const [matchDocument, setMatchDocument] = useState<string>("");
 
   useEffect(() => {
     if (!courseId) return;
     setStats(null);
     setParams({ course: courseId }, { replace: true });
+    setMatchDocument("");
     getGameStats(courseId).then(setStats).catch(() => setStats(null));
+    listDocuments(courseId)
+      .then((found) => setDocuments(found.filter((d) => d.status === "completed")))
+      .catch(() => setDocuments([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
@@ -66,7 +94,13 @@ export default function Arcade() {
           };
     }
     return stats.concepts_available >= 3
-      ? { ready: true, reason: `${stats.concepts_available} concepts to match` }
+      ? {
+          ready: true,
+          reason:
+            stats.match_fresh_rounds > 0
+              ? `${stats.concepts_available} concepts · about ${stats.match_fresh_rounds} round${stats.match_fresh_rounds === 1 ? "" : "s"} of new pairs left`
+              : `${stats.concepts_available} concepts · all matched at least once, so pairs now repeat. Upload more material for new ones.`,
+        }
       : { ready: false, reason: "Upload material for this course first; it needs at least three concepts." };
   }
 
@@ -102,9 +136,9 @@ export default function Arcade() {
                 </div>
                 <div className="flex flex-1 flex-col p-4">
                   <ul className="space-y-1 text-sm text-ink/70">
-                    {info.rules.map((rule) => (
+                    {info.rules.map(([RuleIcon, rule]) => (
                       <li key={rule} className="flex items-start gap-2">
-                        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" aria-hidden />
+                        <RuleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" aria-hidden />
                         {rule}
                       </li>
                     ))}
@@ -119,9 +153,30 @@ export default function Arcade() {
                     </span>
                   </div>
                   <p className={`mt-3 text-xs ${ready ? "text-ink/45" : "text-red-600"}`}>{reason}</p>
+                  {info.game === "concept_match" && ready && documents.length > 1 && (
+                    <label className="mt-3 flex items-center gap-2 text-xs text-ink/60">
+                      <Library className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="shrink-0">Match from</span>
+                      <select
+                        value={matchDocument}
+                        onChange={(e) => setMatchDocument(e.target.value)}
+                        className="input min-w-0 py-1.5 text-xs"
+                      >
+                        <option value="">The whole course</option>
+                        {documents.map((document) => (
+                          <option key={document.id} value={document.id}>
+                            {document.filename}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <div className="mt-auto pt-4">
                     {ready ? (
-                      <Link to={`/play/${courseId}/${info.path}`} className="btn-primary w-full py-2.5">
+                      <Link
+                        to={`/play/${courseId}/${info.path}${info.game === "concept_match" && matchDocument ? `?document=${matchDocument}` : ""}`}
+                        className="btn-primary w-full py-2.5"
+                      >
                         <Play className="h-4 w-4" aria-hidden /> Play
                       </Link>
                     ) : (

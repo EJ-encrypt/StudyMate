@@ -1,5 +1,5 @@
 import { CheckSquare, FileUp, Loader2, Square, X } from "lucide-react";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useState } from "react";
 
 import { errorMessage } from "../api/client";
 import { addCourses, CourseProposal, readCourseList } from "../api/courses";
@@ -7,6 +7,23 @@ import { useAuth } from "../context/AuthContext";
 import { Alert } from "./ui";
 
 const LEVELS = [100, 200, 300, 400, 500, 600];
+
+/**
+ * Which rows start ticked. A handbook page lists a whole programme; only
+ * courses the document places in the chosen level and semester (or does not
+ * place at all) are likely to be this semester's.
+ */
+function defaultTicks(proposals: CourseProposal[], level: number, semester: number): Set<number> {
+  return new Set(
+    proposals.flatMap((proposal, index) =>
+      !proposal.already_added &&
+      (proposal.level === null || proposal.level === level) &&
+      (proposal.semester === null || proposal.semester === semester)
+        ? [index]
+        : [],
+    ),
+  );
+}
 
 /**
  * Upload a course list, registration slip or handbook page, then tick the
@@ -23,23 +40,11 @@ export default function CourseImport({ onDone, onCancel }: { onDone: (added: num
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pre-tick what fits the chosen semester. A handbook page lists a whole
-  // programme; only courses the document places in this level and semester
-  // (or does not place at all) are likely to be this semester's.
-  useEffect(() => {
-    if (!proposals) return;
-    setTicked(
-      new Set(
-        proposals.flatMap((proposal, index) =>
-          !proposal.already_added &&
-          (proposal.level === null || proposal.level === level) &&
-          (proposal.semester === null || proposal.semester === semester)
-            ? [index]
-            : [],
-        ),
-      ),
-    );
-  }, [proposals, level, semester]);
+  function choose(nextLevel: number, nextSemester: number) {
+    setLevel(nextLevel);
+    setSemester(nextSemester);
+    if (proposals) setTicked(defaultTicks(proposals, nextLevel, nextSemester));
+  }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -48,7 +53,9 @@ export default function CourseImport({ onDone, onCancel }: { onDone: (added: num
     setIsReading(true);
     setError(null);
     try {
-      setProposals(await readCourseList(file));
+      const found = await readCourseList(file);
+      setProposals(found);
+      setTicked(defaultTicks(found, level, semester));
     } catch (err) {
       setError(errorMessage(err, "Could not read that file. Try a clearer photo or a PDF."));
     } finally {
@@ -137,7 +144,7 @@ export default function CourseImport({ onDone, onCancel }: { onDone: (added: num
             <span>Add them to</span>
             <select
               value={level}
-              onChange={(e) => setLevel(Number(e.target.value))}
+              onChange={(e) => choose(Number(e.target.value), semester)}
               aria-label="Level"
               className="input w-auto py-1.5"
             >
@@ -149,7 +156,7 @@ export default function CourseImport({ onDone, onCancel }: { onDone: (added: num
             </select>
             <select
               value={semester}
-              onChange={(e) => setSemester(Number(e.target.value))}
+              onChange={(e) => choose(level, Number(e.target.value))}
               aria-label="Semester"
               className="input w-auto py-1.5"
             >

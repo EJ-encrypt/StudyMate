@@ -5,16 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ConceptMatch from "./ConceptMatch";
 
 const submitConceptMatch = vi.fn();
-
-vi.mock("../api/games", () => ({
-  startConceptMatch: vi.fn(async () => ({
+const startConceptMatch = vi.fn();
+const ROUND = {
     course_id: "course-1",
+    document_id: null,
+    pool_size: 2,
+    fresh_in_round: 2,
+    fresh_rounds_left: 0,
+    rounds_played: 0,
+    variety: "fresh",
     personal_best: null,
     pairs: [
       { concept_id: "c1", name: "Deadlock", clue: "Processes each wait on another forever." },
       { concept_id: "c2", name: "Paging", clue: "Memory split into fixed-size blocks." },
     ],
-  })),
+};
+
+vi.mock("../api/games", () => ({
+  startConceptMatch: (...args: unknown[]) => startConceptMatch(...args),
   submitConceptMatch: (...args: unknown[]) => submitConceptMatch(...args),
 }));
 
@@ -35,6 +43,7 @@ describe("Concept Match", () => {
   beforeEach(() => {
     vi.spyOn(Math, "random").mockReturnValue(0.9999);
     submitConceptMatch.mockReset();
+    startConceptMatch.mockReset().mockResolvedValue(ROUND);
     submitConceptMatch.mockResolvedValue({
       game: "concept_match",
       score: 350,
@@ -49,6 +58,13 @@ describe("Concept Match", () => {
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it("warns when the material has run out of new pairs", async () => {
+    startConceptMatch.mockResolvedValue({ ...ROUND, variety: "repeating", fresh_in_round: 0, rounds_played: 4 });
+    renderGame();
+    expect(await screen.findByText(/matched every concept in this course/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Upload more material/ })).toHaveAttribute("href", "/courses/course-1");
+  });
 
   it("lays concepts and meanings out in two columns", async () => {
     renderGame();

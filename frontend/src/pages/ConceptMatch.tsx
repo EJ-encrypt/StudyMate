@@ -1,6 +1,6 @@
-import { ArrowLeft, CheckCircle2, Link2, Timer, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Link2, Repeat, Sparkles, Timer, UploadCloud, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { errorMessage } from "../api/client";
 import { GameResult, MatchPair, MatchRound, startConceptMatch, submitConceptMatch } from "../api/games";
@@ -32,8 +32,56 @@ function formatTime(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+/**
+ * How fresh this round is. A single short file only has so many concepts, so
+ * the student is told when pairs start coming back and nudged to upload more;
+ * a large body of material runs for many rounds before this appears.
+ */
+function VarietyNote({ round, courseId }: { round: MatchRound; courseId: string }) {
+  const where = round.document_id ? "this file" : "this course";
+  const upload = (
+    <Link to={`/courses/${courseId}`} className="inline-flex items-center gap-1 font-semibold text-gold-dark hover:underline">
+      <UploadCloud className="h-3.5 w-3.5" aria-hidden /> Upload more material
+    </Link>
+  );
+
+  let icon = Sparkles;
+  let text: string;
+  let showUpload = false;
+  if (round.variety === "repeating") {
+    icon = Repeat;
+    text = `You have matched every concept in ${where} at least once, so these pairs are repeats.`;
+    showUpload = true;
+  } else if (round.variety === "mixing") {
+    icon = Repeat;
+    text = `${round.fresh_in_round} new pair${round.fresh_in_round === 1 ? "" : "s"} this round; the rest are repeats. You have nearly matched everything in ${where}.`;
+    showUpload = true;
+  } else if (round.fresh_rounds_left === 0) {
+    text = `A fresh set. ${where[0].toUpperCase()}${where.slice(1)} has ${round.pool_size} concepts, so after this round some pairs will repeat.`;
+    showUpload = true;
+  } else {
+    text = `A fresh set, with about ${round.fresh_rounds_left} more round${round.fresh_rounds_left === 1 ? "" : "s"} of new pairs after this one.`;
+  }
+  const Icon = icon;
+  return (
+    <div
+      className={[
+        "mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-xs",
+        round.variety === "fresh" ? "border-ink/10 text-ink/60" : "border-gold/50 bg-gold/10 text-ink/80",
+      ].join(" ")}
+    >
+      <span className="flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-gold-dark" aria-hidden /> {text}
+      </span>
+      {showUpload && upload}
+    </div>
+  );
+}
+
 export default function ConceptMatch() {
   const { courseId } = useParams<{ courseId: string }>();
+  const [params] = useSearchParams();
+  const documentId = params.get("document");
   const [round, setRound] = useState<MatchRound | null>(null);
   // Each column is shuffled on its own, so a concept is rarely level with its meaning.
   const [names, setNames] = useState<MatchPair[]>([]);
@@ -59,14 +107,14 @@ export default function ConceptMatch() {
     setMistakes(0);
     setElapsed(0);
     startedAt.current = null;
-    startConceptMatch(courseId)
+    startConceptMatch(courseId, documentId)
       .then((data) => {
         setRound(data);
         setNames(shuffle(data.pairs));
         setClues(shuffle(data.pairs));
       })
       .catch((err) => setError(errorMessage(err, "Could not start a round.")));
-  }, [courseId]);
+  }, [courseId, documentId]);
 
   useEffect(load, [load]);
 
@@ -203,6 +251,8 @@ export default function ConceptMatch() {
           </span>
         </div>
       </div>
+
+      <VarietyNote round={round} courseId={round.course_id} />
 
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 sm:gap-4">
         <section aria-label="Concepts">

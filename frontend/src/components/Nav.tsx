@@ -7,7 +7,7 @@ import {
   LogOut,
   LucideIcon,
   Settings,
-  Target,
+  Dumbbell,
   UserCircle,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/study", label: "Study Engine", short: "Study", icon: Brain },
   { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2 },
   { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock },
-  { to: "/coach", label: "Coach", short: "Coach", icon: Target },
+  { to: "/coach", label: "Coach", short: "Coach", icon: Dumbbell },
   { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle },
 ];
 

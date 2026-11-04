@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.course import Course
-from app.models.document import CourseConcept
+from app.models.document import CourseConcept, LectureDocument
 from app.models.game import GameSession
 from app.models.user import User
 from app.schemas.assessment import NewBadge
@@ -48,6 +48,7 @@ def _finish(
     mistakes: int,
     duration_ms: int,
     game_xp: int,
+    concept_ids: list[str] | None = None,
 ) -> GameResult:
     previous_best = games.personal_best(db, user.id, course_id, game)
     is_best = previous_best is None or score > previous_best
@@ -64,6 +65,7 @@ def _finish(
             mistakes=mistakes,
             duration_ms=duration_ms,
             xp_awarded=xp,
+            concept_ids=concept_ids,
         )
     )
     db.commit()
@@ -116,6 +118,7 @@ def course_stats(
         ],
         clock_questions_available=len(games._question_pool(db, current_user.id, course_id)),
         concepts_available=concepts,
+        match_fresh_rounds=games.fresh_match_rounds(db, current_user.id, course_id),
     )
 
 
@@ -179,18 +182,29 @@ def submit_beat_the_clock(
 @router.get("/{course_id}/concept-match", response_model=MatchRound)
 def start_concept_match(
     course_id: uuid.UUID,
+    document_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> MatchRound:
     _own_course(db, course_id, current_user)
+    if document_id is not None:
+        document = db.get(LectureDocument, document_id)
+        if document is None or document.student_id != current_user.id or document.course_id != course_id:
+            raise HTTPException(status_code=404, detail="File not found in this course")
     try:
-        pairs = games.concept_match_round(db, current_user.id, course_id)
+        deal = games.concept_match_round(db, current_user.id, course_id, document_id)
     except games.NotEnoughMaterial as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     return MatchRound(
         course_id=course_id,
-        pairs=[MatchPairRead(**p.__dict__) for p in pairs],
+        document_id=document_id,
+        pairs=[MatchPairRead(**p.__dict__) for p in deal.pairs],
         personal_best=games.personal_best(db, current_user.id, course_id, games.CONCEPT_MATCH),
+        pool_size=deal.pool_size,
+        fresh_in_round=deal.fresh_in_round,
+        fresh_rounds_left=deal.fresh_rounds_left,
+        rounds_played=deal.rounds_played,
+        variety=deal.variety,
     )
 
 
@@ -219,4 +233,5 @@ def submit_concept_match(
         mistakes=payload.mistakes,
         duration_ms=payload.duration_ms,
         game_xp=pairs * 2,
+        concept_ids=[str(concept_id) for concept_id in payload.concept_ids],
     )

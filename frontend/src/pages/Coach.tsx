@@ -1,4 +1,4 @@
-import { BookOpenCheck, Lightbulb, ListTree, Target } from "lucide-react";
+import { BookOpenCheck, Dumbbell, Lightbulb, ListTree } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -53,7 +53,7 @@ export default function Coach() {
   return (
     <>
       <PageHeader
-        icon={Target}
+        icon={Dumbbell}
         title="Coach"
         subtitle="How well you know each topic, from the questions you have answered."
       />
@@ -66,7 +66,7 @@ export default function Coach() {
 
       {summary && summary.concept_count === 0 && (
         <EmptyState
-          icon={Target}
+          icon={Dumbbell}
           title="No concepts yet for this course"
           action={
             <Link to="/courses" className="btn-primary">

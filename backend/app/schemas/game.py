@@ -50,8 +50,18 @@ class MatchPairRead(BaseModel):
 
 class MatchRound(BaseModel):
     course_id: uuid.UUID
+    # Set when the round was drawn from one file rather than the whole course.
+    document_id: uuid.UUID | None = None
     pairs: list[MatchPairRead]
     personal_best: int | None
+    # How fresh this round is, so the page can say when the material is
+    # running out of new pairs and suggest uploading more.
+    pool_size: int = 0
+    fresh_in_round: int = 0
+    fresh_rounds_left: int = 0
+    rounds_played: int = 0
+    # "fresh", "mixing" or "repeating".
+    variety: str = "fresh"
 
 
 class MatchSubmit(BaseModel):
@@ -85,3 +95,5 @@ class CourseGameStats(BaseModel):
     games: list[GameStats]
     clock_questions_available: int
     concepts_available: int
+    # Whole-course Concept Match rounds still possible without repeats.
+    match_fresh_rounds: int = 0
