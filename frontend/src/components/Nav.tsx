@@ -7,13 +7,13 @@ import {
   LogOut,
   LucideIcon,
   Settings,
-  Dumbbell,
   Trophy,
   UserCircle,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
+import { CoachIcon } from "../lib/icons";
 
 interface NavItem {
   to: string;
@@ -23,18 +23,21 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { to: "/courses", label: "My Courses", short: "Courses", icon: Library },
-  { to: "/study", label: "Study Engine", short: "Study", icon: Brain },
-  { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2 },
-  { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock },
-  { to: "/coach", label: "Coach", short: "Coach", icon: Dumbbell },
-  { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle },
-];
+const COURSES: NavItem = { to: "/courses", label: "My Courses", short: "Courses", icon: Library };
+const STUDY: NavItem = { to: "/study", label: "Study Engine", short: "Study", icon: Brain };
+const COACH: NavItem = { to: "/coach", label: "Coach", short: "Coach", icon: CoachIcon };
+const ARCADE: NavItem = { to: "/play", label: "Arcade", short: "Arcade", icon: Gamepad2 };
+const LEADERBOARD: NavItem = { to: "/friends", label: "Leaderboard", short: "Leaderboard", icon: Trophy };
+const TIMETABLE: NavItem = { to: "/schedule", label: "Timetable", short: "Timetable", icon: CalendarClock };
+const PROFILE: NavItem = { to: "/profile", label: "Profile", short: "Profile", icon: UserCircle };
+const SETTINGS: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings };
 
-/** In the sidebar and the phone header, not the tab bar, which has no room for more tabs. */
-export const FRIENDS_ITEM: NavItem = { to: "/friends", label: "Friends", short: "Friends", icon: Trophy };
-export const SETTINGS_ITEM: NavItem = { to: "/settings", label: "Settings", short: "Settings", icon: Settings };
+/** Every page, in order, for the sidebar. */
+export const NAV_ITEMS: NavItem[] = [COURSES, STUDY, COACH, ARCADE, LEADERBOARD, TIMETABLE, PROFILE, SETTINGS];
+
+/** The phone tab bar has room for six; Leaderboard and Settings sit in the phone header instead. */
+const HEADER_ITEMS = [LEADERBOARD, SETTINGS];
+export const TAB_ITEMS = NAV_ITEMS.filter((item) => !HEADER_ITEMS.includes(item));
 
 function Brand() {
   return (
@@ -67,7 +70,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {[...NAV_ITEMS, FRIENDS_ITEM, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
+          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -109,7 +112,7 @@ export function MobileHeader() {
         <span className="max-w-[40vw] truncate text-xs text-white/60">
           {user.username ? `@${user.username}` : user.full_name}
         </span>
-        {[FRIENDS_ITEM, SETTINGS_ITEM].map(({ to, label, icon: Icon }) => (
+        {HEADER_ITEMS.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -140,7 +143,7 @@ export function TabBar() {
       className="pb-safe fixed inset-x-0 bottom-0 z-20 border-t border-ink/10 bg-surface/95 backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-6">
-        {NAV_ITEMS.map(({ to, short, icon: Icon }) => (
+        {TAB_ITEMS.map(({ to, short, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

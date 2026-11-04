@@ -1,14 +1,15 @@
-import { BellRing, Brain, Dumbbell, Gamepad2, GraduationCap } from "lucide-react";
+import { BellRing, Brain, Gamepad2, GraduationCap } from "lucide-react";
 import { ReactNode } from "react";
 
 import { useAuth } from "../context/AuthContext";
 import { Alert } from "./ui";
+import { CoachIcon } from "../lib/icons";
 
 const FEATURES = [
   { icon: Brain, text: "Quizzes, flashcards and exam papers from your own slides and notes" },
   { icon: Gamepad2, text: "Revise with games: Beat the Clock and Concept Match" },
   { icon: BellRing, text: "Reminders before every lecture, and a nudge to capture what you learnt" },
-  { icon: Dumbbell, text: "A coach that tracks every topic and tells you what to revise next" },
+  { icon: CoachIcon, text: "A coach that tracks every topic and tells you what to revise next" },
 ];
 
 /** Split layout for the signed-out pages: product pitch beside the form. */

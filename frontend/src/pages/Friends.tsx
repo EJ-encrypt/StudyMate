@@ -450,7 +450,7 @@ export default function Friends() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader icon={Trophy} title="Friends" subtitle="Leaderboards, friends and challenges." />
+      <PageHeader icon={Trophy} title="Leaderboard" subtitle="Leaderboards, friends and challenges." />
       <div className="mb-5">
         <Segmented
           label="Section"

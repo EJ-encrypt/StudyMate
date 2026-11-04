@@ -9,7 +9,6 @@ import {
   Library,
   LucideIcon,
   Settings,
-  Dumbbell,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -18,6 +17,7 @@ import { useLocation } from "react-router-dom";
 
 import { updatePreferences } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { CoachIcon } from "../lib/icons";
 
 interface Step {
   icon: LucideIcon;
@@ -60,7 +60,7 @@ export const STEPS: Step[] = [
     body: "Enter your lectures, or upload a photo of your timetable. StudyMate reminds you an hour before each lecture and when it starts, then asks what you learnt so it becomes notes.",
   },
   {
-    icon: Dumbbell,
+    icon: CoachIcon,
     title: "6. Follow your Coach",
     body: "The Coach tracks how well you know every concept from the questions you answer, and picks up to five topics to revise next.",
   },

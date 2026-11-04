@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-import { NAV_ITEMS, Sidebar, TabBar } from "./Nav";
+import { NAV_ITEMS, Sidebar, TAB_ITEMS, TabBar } from "./Nav";
 
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({
@@ -26,14 +26,29 @@ describe("Navigation", () => {
     expect(container).toHaveTextContent("Ama Mensah");
   });
 
-  it("offers the same sections in the phone tab bar", () => {
+  it("puts the sections in study order", () => {
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual([
+      "My Courses",
+      "Study Engine",
+      "Coach",
+      "Arcade",
+      "Leaderboard",
+      "Timetable",
+      "Profile",
+      "Settings",
+    ]);
+  });
+
+  it("fits the main sections in the phone tab bar, in the same order", () => {
     render(
       <MemoryRouter>
         <TabBar />
       </MemoryRouter>,
     );
     const bar = screen.getByRole("navigation", { name: "Main" });
-    expect(within(bar).getAllByRole("link")).toHaveLength(NAV_ITEMS.length);
+    const links = within(bar).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(TAB_ITEMS.map((item) => item.short));
+    expect(links.map((link) => link.textContent)).toEqual(["Courses", "Study", "Coach", "Arcade", "Timetable", "Profile"]);
     expect(within(bar).getByRole("link", { name: "Timetable" })).toHaveAttribute("href", "/schedule");
   });
 });

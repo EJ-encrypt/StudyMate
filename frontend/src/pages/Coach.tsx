@@ -1,4 +1,4 @@
-import { BookOpenCheck, Dumbbell, Lightbulb, ListTree } from "lucide-react";
+import { BookOpenCheck, Lightbulb, ListTree } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,6 +13,7 @@ import CourseSelect from "../components/CourseSelect";
 import MathText from "../components/MathText";
 import PageHeader from "../components/PageHeader";
 import { Alert, EmptyState, StatTile } from "../components/ui";
+import { CoachIcon } from "../lib/icons";
 
 function StatusBadge({ status }: { status: ConceptStatus }) {
   return (
@@ -53,7 +54,7 @@ export default function Coach() {
   return (
     <>
       <PageHeader
-        icon={Dumbbell}
+        icon={CoachIcon}
         title="Coach"
         subtitle="How well you know each topic, from the questions you have answered."
       />
@@ -66,7 +67,7 @@ export default function Coach() {
 
       {summary && summary.concept_count === 0 && (
         <EmptyState
-          icon={Dumbbell}
+          icon={CoachIcon}
           title="No concepts yet for this course"
           action={
             <Link to="/courses" className="btn-primary">

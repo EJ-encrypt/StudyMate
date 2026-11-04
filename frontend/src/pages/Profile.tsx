@@ -69,7 +69,7 @@ export default function Profile() {
         actions={
           <>
             <Link to="/friends" className="btn-gold">
-              <Users className="h-4 w-4" aria-hidden /> Friends & leaderboard
+              <Users className="h-4 w-4" aria-hidden /> Leaderboard & friends
             </Link>
             <button type="button" onClick={() => void logout()} className="btn-secondary md:hidden">
               <LogOut className="h-4 w-4" aria-hidden /> Log out
