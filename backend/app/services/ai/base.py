@@ -89,6 +89,20 @@ class ShortAnswerGrade(BaseModel):
     feedback: str
 
 
+class ConceptLink(BaseModel):
+    """How one concept ties into the topic it is grouped under."""
+
+    name: str
+    link: str
+
+
+class TopicExplanation(BaseModel):
+    """What ties a group of concepts together, for revising them as one topic."""
+
+    overview: str
+    links: list[ConceptLink]
+
+
 class TimetableEntry(BaseModel):
     """One weekly lecture read from a timetable. No defaults, for Gemini's schema."""
 
@@ -173,6 +187,10 @@ class AIProvider(ABC):
         the fallback chain simply moves on to one that has it.
         """
         raise NotImplementedError(f"{type(self).__name__} cannot read timetables")
+
+    def explain_topic(self, course_name: str, concepts: list[tuple[str, str, bool]]) -> TopicExplanation:
+        """How a group of related concepts fit together; (name, summary, needs work) each."""
+        raise NotImplementedError(f"{type(self).__name__} cannot explain topics")
 
     def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
         """Read the courses on a course list, registration slip or handbook page."""

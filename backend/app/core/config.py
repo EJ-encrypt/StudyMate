@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     limit_documents_per_day: int = 40
     limit_reads_per_day: int = 15
     limit_grading_per_day: int = 60
+    limit_explanations_per_day: int = 40
 
     # Error reporting (Sentry). Off when empty.
     sentry_dsn: str = ""

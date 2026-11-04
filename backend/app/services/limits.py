@@ -32,6 +32,7 @@ LIMITS = {
     "document": Limit("limit_documents_per_day", "uploads to read"),
     "read": Limit("limit_reads_per_day", "photos of timetables or course lists"),
     "grade": Limit("limit_grading_per_day", "written answers marked by AI"),
+    "explain": Limit("limit_explanations_per_day", "topic explanations"),
 }
 
 

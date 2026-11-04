@@ -228,6 +228,26 @@ def timetable_prompt(known_courses: list[tuple[str, str]], extra_text: str = "")
     )
 
 
+def topic_explanation_prompt(course_name: str, concepts: list[tuple[str, str, bool]]) -> str:
+    listed = "\n".join(
+        f"- {name}{' (the student needs work on this)' if needs_work else ''}: {summary}"
+        for name, summary, needs_work in concepts
+    )
+    return (
+        f"A student revising {course_name} has these related concepts grouped into "
+        "one revision topic, with the definitions from their own material:\n"
+        f"{listed}\n\n"
+        "Write, addressing the student directly and in plain words:\n"
+        "- overview: two sentences on what ties these concepts together and why "
+        "they are worth revising as one topic.\n"
+        "- links: for each concept marked as needing work, one sentence on how it "
+        "connects to the others in the group, using the concept's exact name. "
+        "Leave out the concepts not marked.\n"
+        "Use only what the definitions say; do not add facts that are not there. "
+        "Write mathematics in LaTeX between $ signs."
+    )
+
+
 def course_list_prompt(extra_text: str = "") -> str:
     """Read a course list, registration slip or handbook page.
 
@@ -257,6 +277,7 @@ def transcription_prompt() -> str:
         "Describe a graph or diagram in one sentence in square brackets. It may be "
         "photos of handwritten notes from an exercise book: read the handwriting, "
         "ignore ruled lines, margins and crossed-out words, and keep the pages in "
-        "order. Write [unclear] for a word that cannot be read. Do not add "
+        "order. Write [unclear] for a word that cannot be read. Start each page "
+        "with a line of its own saying Page 1, Page 2 and so on. Do not add "
         "commentary, summaries or anything that is not in the material."
     )

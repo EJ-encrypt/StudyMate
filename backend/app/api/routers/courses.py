@@ -218,3 +218,18 @@ def list_course_concepts(
         )
         for concept, document_count in rows
     ]
+
+
+@router.delete("/{course_id}", status_code=204)
+def delete_course(
+    course_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Delete a course with its files, questions, Coach progress and Arcade scores."""
+    from app.services.accounts import delete_course as delete_course_and_data
+
+    course = db.get(Course, course_id)
+    if course is None or course.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Course not found")
+    delete_course_and_data(db, course)

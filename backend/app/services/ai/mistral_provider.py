@@ -33,12 +33,14 @@ from app.services.ai.base import (
     ShortAnswerGrade,
     ShortAnswerSubmission,
     TimetableEntry,
+    TopicExplanation,
 )
 from app.services.ai.prompts import (
     MAX_INPUT_CHARS,
     concept_extraction_prompt,
     course_list_prompt,
     course_summary_prompt,
+    topic_explanation_prompt,
     generation_prompt,
     grading_prompt,
     same_concept_prompt,
@@ -174,6 +176,9 @@ class MistralProvider(AIProvider):
 
     def summarise_course(self, course_name: str, concepts: list[tuple[str, str]]) -> str:
         return self._structured(course_summary_prompt(course_name, concepts), _CourseSummary).summary.strip()
+
+    def explain_topic(self, course_name: str, concepts: list[tuple[str, str, bool]]) -> TopicExplanation:
+        return self._structured(topic_explanation_prompt(course_name, concepts), TopicExplanation)
 
     def are_same_concept(self, pairs: list[tuple[str, str]]) -> list[bool]:
         if not pairs:

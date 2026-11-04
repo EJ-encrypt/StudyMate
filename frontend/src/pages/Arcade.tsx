@@ -189,7 +189,7 @@ export default function Arcade() {
       )}
 
       <div className="mb-5">
-        <CourseSelect selectedCourseId={courseId} onSelect={setCourseId} allowCreate={false} />
+        <CourseSelect selectedCourseId={courseId} onSelect={setCourseId} />
       </div>
 
       {courseId && !stats && <ListSkeleton grid rows={3} />}

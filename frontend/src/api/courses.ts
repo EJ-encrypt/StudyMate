@@ -94,3 +94,8 @@ export async function addCourses(courses: CreateCoursePayload[]): Promise<Course
   const { data } = await apiClient.post<Course[]>("/courses/bulk", { courses });
   return data;
 }
+
+/** Deletes the course with its files, questions, Coach progress and Arcade scores. */
+export async function deleteCourse(courseId: string): Promise<void> {
+  await apiClient.delete(`/courses/${courseId}`);
+}

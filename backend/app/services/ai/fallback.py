@@ -23,6 +23,7 @@ from app.services.ai.base import (
     ShortAnswerSubmission,
     CourseEntry,
     TimetableEntry,
+    TopicExplanation,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,9 @@ class FallbackProvider(AIProvider):
         return self._first_that_works(
             "summarise_course", lambda p: p.summarise_course(course_name, concepts)
         )
+
+    def explain_topic(self, course_name: str, concepts: list[tuple[str, str, bool]]) -> TopicExplanation:
+        return self._first_that_works("explain_topic", lambda p: p.explain_topic(course_name, concepts))
 
     def read_timetable(
         self,

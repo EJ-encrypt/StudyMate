@@ -23,6 +23,7 @@ import {
   retryDocument,
   uploadDocuments,
 } from "../api/documents";
+import DeleteCourse from "../components/DeleteCourse";
 import PageHeader from "../components/PageHeader";
 import PhotoNotes from "../components/PhotoNotes";
 import { Alert, EmptyState, StatusPill } from "../components/ui";
@@ -318,6 +319,8 @@ export default function CourseDetail() {
           ))}
         </ul>
       )}
+
+      {course && <DeleteCourse course={course} />}
     </>
   );
 }

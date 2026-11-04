@@ -20,6 +20,7 @@ from app.services.ai.base import (
     ShortAnswerGrade,
     ShortAnswerSubmission,
     TimetableEntry,
+    TopicExplanation,
 )
 from app.services.ai.prompts import (
     concept_extraction_prompt,
@@ -27,6 +28,7 @@ from app.services.ai.prompts import (
     generation_prompt,
     grading_prompt,
     course_summary_prompt,
+    topic_explanation_prompt,
     same_concept_prompt,
     timetable_prompt,
     transcription_prompt,
@@ -210,6 +212,10 @@ class GeminiProvider(AIProvider):
             contents.insert(0, types.Part.from_bytes(data=data, mime_type=mime_type))
         response = self._generate_with_retry(contents, _Timetable)
         return _Timetable.model_validate_json(response.text).entries
+
+    def explain_topic(self, course_name: str, concepts: list[tuple[str, str, bool]]) -> TopicExplanation:
+        response = self._generate_with_retry(topic_explanation_prompt(course_name, concepts), TopicExplanation)
+        return TopicExplanation.model_validate_json(response.text)
 
     def read_course_list(self, data: bytes, mime_type: str, extra_text: str = "") -> list[CourseEntry]:
         contents: list = [course_list_prompt(extra_text)]

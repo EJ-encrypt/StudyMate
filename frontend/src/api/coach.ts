@@ -12,6 +12,8 @@ export interface ConceptProgress {
   correct: number;
   status: ConceptStatus;
   last_seen_at: string | null;
+  /** Filled for concepts in revision topics: where the material explains it. */
+  sources?: ConceptSource[];
 }
 
 export interface CoachSummary {
@@ -60,6 +62,8 @@ export async function getCoachSummary(courseId: string): Promise<CoachSummary> {
 export interface ConceptSource {
   document_id: string;
   filename: string;
+  /** "Slide 4" or "Page 2" where the material marks it. */
+  location: string | null;
 }
 
 export interface ConceptDetail {
@@ -78,5 +82,17 @@ export interface ConceptDetail {
 
 export async function getConceptDetail(conceptId: string): Promise<ConceptDetail> {
   const { data } = await apiClient.get<ConceptDetail>(`/coach/concept/${conceptId}`);
+  return data;
+}
+
+export interface TopicExplanation {
+  overview: string;
+  /** Concept id -> how it ties into the topic, for the concepts that need work. */
+  links: Record<string, string>;
+}
+
+/** Written by the AI the first time a topic is opened, then kept. */
+export async function explainTopic(courseId: string, conceptIds: string[]): Promise<TopicExplanation> {
+  const { data } = await apiClient.post<TopicExplanation>(`/coach/${courseId}/explain`, { concept_ids: conceptIds });
   return data;
 }

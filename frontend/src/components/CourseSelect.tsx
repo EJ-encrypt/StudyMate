@@ -1,87 +1,59 @@
-import { BookOpen, Plus } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { BookOpen } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Course, createCourse, listCourses } from "../api/courses";
+import { Course, listCourses } from "../api/courses";
+import { useAuth } from "../context/AuthContext";
+import { coursesIn, startingTerm, Term } from "../lib/term";
+import TermPicker from "./TermPicker";
 
 interface CourseSelectProps {
   selectedCourseId: string | null;
   onSelect: (courseId: string) => void;
-  /** Hide the inline "new course" form where creating one makes no sense. */
-  allowCreate?: boolean;
 }
 
-export default function CourseSelect({ selectedCourseId, onSelect, allowCreate = true }: CourseSelectProps) {
+/**
+ * Level, semester, then course. Starts on the term last chosen (or the
+ * student's current one), so revising an earlier year is two taps away.
+ */
+export default function CourseSelect({ selectedCourseId, onSelect }: CourseSelectProps) {
+  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [term, setTerm] = useState<Term | null>(null);
 
   useEffect(() => {
     listCourses().then((fetched) => {
       setCourses(fetched);
-      if (!selectedCourseId && fetched.length > 0) {
-        onSelect(fetched[0].id);
-      }
+      const start = startingTerm(fetched, { level: user?.level ?? undefined, semester: user?.semester ?? undefined }, selectedCourseId);
+      setTerm(start);
+      const inTerm = coursesIn(fetched, start);
+      if (!inTerm.some((course) => course.id === selectedCourseId) && inTerm.length > 0) onSelect(inTerm[0].id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleCreate(event: FormEvent) {
-    event.preventDefault();
-    const course = await createCourse({ name, code });
-    setCourses((prev) => [...prev, course]);
-    onSelect(course.id);
-    setIsCreating(false);
-    setName("");
-    setCode("");
+  const shown = coursesIn(courses, term);
+
+  function changeTerm(next: Term) {
+    setTerm(next);
+    const first = coursesIn(courses, next)[0];
+    if (first) onSelect(first.id);
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <TermPicker courses={courses} term={term} onChange={changeTerm} />
       <label className="relative flex min-w-0 flex-1 items-center sm:max-w-sm">
         <span className="sr-only">Course</span>
         <BookOpen className="pointer-events-none absolute left-3 h-4 w-4 text-ink/40" aria-hidden />
-        <select
-          value={selectedCourseId ?? ""}
-          onChange={(e) => onSelect(e.target.value)}
-          className="input pl-9 font-medium"
-        >
-          {courses.length === 0 && <option value="">No courses yet</option>}
-          {courses.map((course) => (
+        <select value={selectedCourseId ?? ""} onChange={(e) => onSelect(e.target.value)} className="input pl-9 font-medium">
+          {shown.length === 0 && <option value="">No courses yet</option>}
+          {shown.map((course) => (
             <option key={course.id} value={course.id}>
               {course.code} - {course.name}
             </option>
           ))}
         </select>
       </label>
-      {allowCreate && (
-        <button type="button" onClick={() => setIsCreating((prev) => !prev)} className="btn-ghost text-gold-dark">
-          <Plus className="h-4 w-4" aria-hidden /> New course
-        </button>
-      )}
-      {isCreating && (
-        <form onSubmit={handleCreate} className="flex w-full flex-wrap items-center gap-2">
-          <input
-            type="text"
-            placeholder="Code (e.g. CS201)"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-            className="input w-36"
-          />
-          <input
-            type="text"
-            placeholder="Course name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="input w-56"
-          />
-          <button type="submit" className="btn-primary">
-            Create
-          </button>
-        </form>
-      )}
     </div>
   );
 }

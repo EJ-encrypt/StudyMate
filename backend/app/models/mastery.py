@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -34,3 +34,21 @@ class ConceptMastery(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class TopicExplanation(Base):
+    """The AI's note on how a revision topic's concepts fit together, kept so it is written once.
+
+    Keyed by the topic's concepts and which of them need work: when either
+    changes, the topic is a different one and gets a fresh note.
+    """
+
+    __tablename__ = "topic_explanations"
+
+    student_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False, index=True)
+    overview: Mapped[str] = mapped_column(Text, nullable=False)
+    # Concept id -> one sentence on how it ties in.
+    links: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

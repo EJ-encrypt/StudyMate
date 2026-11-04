@@ -287,6 +287,21 @@ export default function Schedule() {
     byDay.set(slot.day_of_week, [...(byDay.get(slot.day_of_week) ?? []), slot]);
   }
 
+  const editForm = editing && (
+    <form onSubmit={handleSave} className={`card animate-fade-in p-4 ${editing.id ? "" : "mb-6"}`}>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-semibold text-ink">{editing.id ? "Edit lecture" : "Add a lecture"}</h2>
+        <button type="button" onClick={() => setEditing(null)} className="btn-ghost" aria-label="Close">
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      <SlotFields courses={courses} value={editing.value} onChange={(value) => setEditing({ ...editing, value })} />
+      <button type="submit" disabled={isSaving} className="btn-primary mt-4">
+        {isSaving ? "Saving..." : "Save lecture"}
+      </button>
+    </form>
+  );
+
   return (
     <>
       <PageHeader
@@ -399,20 +414,7 @@ export default function Schedule() {
         </section>
       )}
 
-      {editing && (
-        <form onSubmit={handleSave} className="card mb-6 animate-fade-in p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-ink">{editing.id ? "Edit lecture" : "Add a lecture"}</h2>
-            <button type="button" onClick={() => setEditing(null)} className="btn-ghost" aria-label="Close">
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-          <SlotFields courses={courses} value={editing.value} onChange={(value) => setEditing({ ...editing, value })} />
-          <button type="submit" disabled={isSaving} className="btn-primary mt-4">
-            {isSaving ? "Saving..." : "Save lecture"}
-          </button>
-        </form>
-      )}
+      {editing && !editing.id && editForm}
 
       {slots === null && <ListSkeleton rows={3} />}
 
@@ -448,61 +450,65 @@ export default function Schedule() {
                 </h2>
                 <ul className="space-y-2">
                   {byDay.get(day)!.map((slot) => (
-                    <li key={slot.id} className="card flex items-center gap-3 p-3">
-                      <div className="flex w-14 shrink-0 flex-col items-center rounded-lg bg-navy py-1.5 text-white">
-                        <span className="text-[10px] font-semibold uppercase text-gold">{SHORT_DAYS[day]}</span>
-                        <span className="text-sm font-bold">{hhmm(slot.start_time)}</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-sm font-semibold text-ink">
-                          {slot.course_code && <span className="mr-1.5 text-gold-dark">{slot.course_code}</span>}
-                          {slot.title}
-                        </p>
-                        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink/55">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" aria-hidden />
-                            {hhmm(slot.start_time)}–{hhmm(slot.end_time)}
-                          </span>
-                          {slot.venue && (
+                    editing?.id === slot.id ? (
+                      <li key={slot.id}>{editForm}</li>
+                    ) : (
+                      <li key={slot.id} className="card flex items-center gap-3 p-3">
+                        <div className="flex w-14 shrink-0 flex-col items-center rounded-lg bg-navy py-1.5 text-white">
+                          <span className="text-[10px] font-semibold uppercase text-gold">{SHORT_DAYS[day]}</span>
+                          <span className="text-sm font-bold">{hhmm(slot.start_time)}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-semibold text-ink">
+                            {slot.course_code && <span className="mr-1.5 text-gold-dark">{slot.course_code}</span>}
+                            {slot.title}
+                          </p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink/55">
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" aria-hidden />
-                              {slot.venue}
+                              <Clock className="h-3 w-3" aria-hidden />
+                              {hhmm(slot.start_time)}–{hhmm(slot.end_time)}
                             </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center">
-                        <Link to={`/lectures/${slot.id}/reflect`} className="btn-ghost" title="Write what you learnt">
-                          <NotebookPen className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Reflect</span>
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditing({
-                              id: slot.id,
-                              value: {
-                                title: slot.title,
-                                course_id: slot.course_id,
-                                day_of_week: slot.day_of_week,
-                                start_time: hhmm(slot.start_time),
-                                end_time: hhmm(slot.end_time),
-                                venue: slot.venue,
-                              },
-                            })
-                          }
-                          className="btn-ghost"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Edit</span>
-                        </button>
-                        <button type="button" onClick={() => void handleDelete(slot)} className="btn-ghost hover:text-red-600" title="Remove">
-                          <Trash2 className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Remove</span>
-                        </button>
-                      </div>
-                    </li>
+                            {slot.venue && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" aria-hidden />
+                                {slot.venue}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center">
+                          <Link to={`/lectures/${slot.id}/reflect`} className="btn-ghost" title="Write what you learnt">
+                            <NotebookPen className="h-4 w-4" aria-hidden />
+                            <span className="sr-only">Reflect</span>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditing({
+                                id: slot.id,
+                                value: {
+                                  title: slot.title,
+                                  course_id: slot.course_id,
+                                  day_of_week: slot.day_of_week,
+                                  start_time: hhmm(slot.start_time),
+                                  end_time: hhmm(slot.end_time),
+                                  venue: slot.venue,
+                                },
+                              })
+                            }
+                            className="btn-ghost"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden />
+                            <span className="sr-only sm:not-sr-only">Edit</span>
+                          </button>
+                          <button type="button" onClick={() => void handleDelete(slot)} className="btn-ghost hover:text-red-600" title="Remove">
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                            <span className="sr-only sm:not-sr-only">Remove</span>
+                          </button>
+                        </div>
+                      </li>
+                    )
                   ))}
                 </ul>
               </div>

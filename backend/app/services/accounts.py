@@ -20,7 +20,7 @@ from app.models.document import CourseConcept, KnowledgeConcept, LectureDocument
 from app.models.game import GameSession
 from app.models.gamification import EarnedBadge, StudentProgress
 from app.models.job import Job
-from app.models.mastery import ConceptMastery
+from app.models.mastery import ConceptMastery, TopicExplanation
 from app.models.schedule import LectureSlot, PushSubscription, SentReminder
 from app.models.review import FlashcardReview
 from app.models.social import Challenge, Friendship, GameRound, UserBlock, UserReport, XpEvent
@@ -51,6 +51,7 @@ def delete_account(db: Session, user: User) -> None:
     gone(db.query(AssessmentItem).filter(AssessmentItem.assessment_id.in_(assessments.scalar_subquery())))
     gone(db.query(Assessment).filter(Assessment.student_id == student_id))
     gone(db.query(ConceptMastery).filter(ConceptMastery.student_id == student_id))
+    gone(db.query(TopicExplanation).filter(TopicExplanation.student_id == student_id))
     gone(db.query(KnowledgeConcept).filter(KnowledgeConcept.student_id == student_id))
     gone(db.query(CourseConcept).filter(CourseConcept.student_id == student_id))
     gone(db.query(LectureDocument).filter(LectureDocument.student_id == student_id))
@@ -85,6 +86,55 @@ def delete_account(db: Session, user: User) -> None:
         logger.warning("Could not delete %s stored files for %s: %s", len(paths), student_id, exc)
 
     _delete_auth_user(student_id)
+
+
+def delete_course(db: Session, course: Course) -> None:
+    """Delete one course and everything that belongs to it.
+
+    Its files, concepts, question sets and attempts, Coach progress, flashcard
+    schedule, Arcade scores and rounds (with any challenges sent from them)
+    all go. Lectures on the timetable stay, unlinked from the course, since
+    the lecture still happens. XP and badges already earned are kept.
+    """
+    course_id = course.id
+    documents = db.query(LectureDocument.id).filter(LectureDocument.course_id == course_id)
+    paths = [path for (path,) in db.query(LectureDocument.storage_path).filter(LectureDocument.course_id == course_id)]
+    assessments = db.query(Assessment.id).filter(Assessment.course_id == course_id)
+    items = db.query(AssessmentItem.id).filter(AssessmentItem.assessment_id.in_(assessments.scalar_subquery()))
+    attempts = db.query(Attempt.id).filter(Attempt.assessment_id.in_(assessments.scalar_subquery()))
+    rounds = db.query(GameRound.id).filter(GameRound.course_id == course_id)
+    queued_for = {str(i) for (i,) in documents} | {str(i) for (i,) in assessments}
+
+    def gone(query) -> None:
+        query.delete(synchronize_session=False)
+
+    for job in db.query(Job).filter(Job.student_id == course.owner_id, Job.status.in_(("queued", "running"))):
+        if {str(v) for v in (job.payload or {}).values()} & queued_for:
+            db.delete(job)
+    gone(db.query(FlashcardReview).filter(FlashcardReview.item_id.in_(items.scalar_subquery())))
+    gone(db.query(AttemptAnswer).filter(AttemptAnswer.attempt_id.in_(attempts.scalar_subquery())))
+    gone(db.query(Attempt).filter(Attempt.assessment_id.in_(assessments.scalar_subquery())))
+    gone(db.query(AssessmentItem).filter(AssessmentItem.assessment_id.in_(assessments.scalar_subquery())))
+    gone(db.query(Assessment).filter(Assessment.course_id == course_id))
+    gone(db.query(ConceptMastery).filter(ConceptMastery.course_id == course_id))
+    gone(db.query(TopicExplanation).filter(TopicExplanation.course_id == course_id))
+    gone(db.query(KnowledgeConcept).filter(KnowledgeConcept.course_id == course_id))
+    gone(db.query(CourseConcept).filter(CourseConcept.course_id == course_id))
+    gone(db.query(LectureDocument).filter(LectureDocument.course_id == course_id))
+    gone(db.query(GameSession).filter(GameSession.course_id == course_id))
+    gone(db.query(Challenge).filter(Challenge.round_id.in_(rounds.scalar_subquery())))
+    gone(db.query(GameRound).filter(GameRound.course_id == course_id))
+    db.query(LectureSlot).filter(LectureSlot.course_id == course_id).update(
+        {LectureSlot.course_id: None}, synchronize_session=False
+    )
+    gone(db.query(Enrollment).filter(Enrollment.course_id == course_id))
+    db.delete(course)
+    db.commit()
+
+    try:
+        get_storage().delete(paths)
+    except Exception as exc:  # noqa: BLE001 -- the course is already gone
+        logger.warning("Could not delete %s stored files for course %s: %s", len(paths), course_id, exc)
 
 
 def _delete_auth_user(student_id: uuid.UUID) -> None:

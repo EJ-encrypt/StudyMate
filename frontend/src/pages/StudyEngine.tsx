@@ -2,25 +2,34 @@ import { Brain, Library } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Course, groupByLevelAndSemester, listCourses } from "../api/courses";
+import { Course, listCourses } from "../api/courses";
 import CourseCard from "../components/CourseCard";
 import PageHeader from "../components/PageHeader";
+import TermPicker from "../components/TermPicker";
 import { Alert, EmptyState, ListSkeleton } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
+import { coursesIn, startingTerm, Term } from "../lib/term";
 
 export default function StudyEngine() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState<Course[] | null>(null);
+  const [term, setTerm] = useState<Term | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listCourses()
-      .then(setCourses)
+      .then((fetched) => {
+        setCourses(fetched);
+        setTerm(startingTerm(fetched, { level: user?.level ?? undefined, semester: user?.semester ?? undefined }));
+      })
       .catch(() => {
         setCourses([]);
         setError("Could not load your courses.");
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const groups = groupByLevelAndSemester(courses ?? []);
+  const shown = coursesIn(courses ?? [], term);
   const anyMaterial = (courses ?? []).some((course) => course.document_count > 0);
 
   return (
@@ -64,11 +73,13 @@ export default function StudyEngine() {
         </div>
       )}
 
-      {groups.map((group) => (
-        <section key={group.key} className="mb-6">
-          <h2 className="section-title">{group.label}</h2>
+      {courses && courses.length > 0 && (
+        <>
+          <div className="mb-4">
+            <TermPicker courses={courses} term={term} onChange={setTerm} />
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {group.courses.map((course) => (
+            {shown.map((course) => (
               <CourseCard
                 key={course.id}
                 course={course}
@@ -77,8 +88,8 @@ export default function StudyEngine() {
               />
             ))}
           </div>
-        </section>
-      ))}
+        </>
+      )}
     </>
   );
 }

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ConceptProgressRead(BaseModel):
@@ -15,6 +15,8 @@ class ConceptProgressRead(BaseModel):
     correct: int
     status: str
     last_seen_at: datetime | None
+    # Filled for concepts in revision topics: where the student's material explains it.
+    sources: list["ConceptSourceRead"] = []
 
 
 class RevisionTopicRead(BaseModel):
@@ -48,6 +50,18 @@ class ConceptSourceRead(BaseModel):
 
     document_id: uuid.UUID
     filename: str
+    # "Slide 4" or "Page 2" where the material marks it.
+    location: str | None = None
+
+
+class TopicExplainRequest(BaseModel):
+    concept_ids: list[uuid.UUID] = Field(min_length=1, max_length=25)
+
+
+class TopicExplanationRead(BaseModel):
+    overview: str
+    # Concept id -> how it ties into the topic, for the concepts that need work.
+    links: dict[str, str]
 
 
 class ConceptDetailRead(BaseModel):
@@ -67,3 +81,7 @@ class ConceptDetailRead(BaseModel):
     # What the lectures actually said about it, which may be phrased
     # differently in each one.
     mentions: list[str]
+
+
+# ConceptProgressRead names ConceptSourceRead before it is defined.
+ConceptProgressRead.model_rebuild()
