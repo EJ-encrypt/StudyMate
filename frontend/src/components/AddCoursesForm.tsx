@@ -23,11 +23,14 @@ const blankRow = (): Row => ({ key: nextKey++, code: "", name: "" });
 export default function AddCoursesForm({
   level: startLevel,
   semester: startSemester,
+  fixed = false,
   onClose,
   onAdded,
 }: {
   level: number;
   semester: number;
+  /** Opened from a semester's own Add button: the courses go there, so there is nothing to choose. */
+  fixed?: boolean;
   onClose: () => void;
   /** Called with how many were added, and how many were already in the list. */
   onAdded: (added: number, skipped: number, level: number) => void;
@@ -68,31 +71,35 @@ export default function AddCoursesForm({
   return (
     <form onSubmit={save} className="card mb-5 animate-fade-in p-4" data-tour="courses-add-form">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold text-ink">Add courses</h2>
+        <h2 className="font-semibold text-ink">
+          {fixed ? `Add Level ${level}, Semester ${semester} courses` : "Add courses"}
+        </h2>
         <button type="button" onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:w-80">
-        <label>
-          <span className="label">Level</span>
-          <select value={level} onChange={(e) => setLevel(Number(e.target.value))} className="input mt-1">
-            {LEVELS.map((value) => (
-              <option key={value} value={value}>
-                Level {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="label">Semester</span>
-          <select value={semester} onChange={(e) => setSemester(Number(e.target.value))} className="input mt-1">
-            <option value={1}>Semester 1</option>
-            <option value={2}>Semester 2</option>
-          </select>
-        </label>
-      </div>
+      {!fixed && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:w-80">
+          <label>
+            <span className="label">Level</span>
+            <select value={level} onChange={(e) => setLevel(Number(e.target.value))} className="input mt-1">
+              {LEVELS.map((value) => (
+                <option key={value} value={value}>
+                  Level {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="label">Semester</span>
+            <select value={semester} onChange={(e) => setSemester(Number(e.target.value))} className="input mt-1">
+              <option value={1}>Semester 1</option>
+              <option value={2}>Semester 2</option>
+            </select>
+          </label>
+        </div>
+      )}
 
       <ul className="space-y-2">
         {rows.map((row, index) => (
@@ -140,9 +147,11 @@ export default function AddCoursesForm({
             ? "Saving..."
             : `Save ${filled.length || ""} course${filled.length === 1 ? "" : "s"}`.replace("  ", " ")}
         </button>
-        <span className="text-xs text-ink/50">
-          Level {level}, Semester {semester}
-        </span>
+        {!fixed && (
+          <span className="text-xs text-ink/50">
+            Level {level}, Semester {semester}
+          </span>
+        )}
       </div>
     </form>
   );

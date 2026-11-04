@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import InstallPrompt from "./components/InstallPrompt";
+import InstallSheet from "./components/InstallSheet";
 import { MobileHeader, Sidebar, TabBar } from "./components/Nav";
+import OfflineBanner from "./components/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Toaster from "./components/Toaster";
 import Tour from "./components/Tour";
@@ -52,6 +54,7 @@ export default function App() {
       <Tour />
       <Sidebar />
       <div className="min-w-0 flex-1">
+        {user && <OfflineBanner />}
         <MobileHeader />
         <RequireOnboarding />
         <main className={user ? "mx-auto max-w-5xl px-4 pb-24 pt-5 sm:px-6 md:pb-10 md:pt-8" : ""}>
@@ -90,6 +93,7 @@ export default function App() {
         </main>
         <TabBar />
         <Toaster />
+        <InstallSheet />
       </div>
     </div>
   );

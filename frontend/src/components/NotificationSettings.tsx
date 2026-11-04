@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { updatePreferences } from "../api/auth";
 import { errorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { showInstallHelp } from "../lib/installHelp";
 import {
   NotificationConfig,
   PushState,
   disablePush,
   enablePush,
   getNotificationConfig,
+  isIos,
   pushState,
   sendTestNotification,
 } from "../lib/push";
@@ -52,6 +54,12 @@ export default function NotificationSettings() {
   }, []);
 
   async function togglePush(on: boolean) {
+    // On an iPhone not yet on the Home Screen, say how to get there, in a
+    // sheet over the page rather than a line further down it.
+    if (on && state === "needs-install") {
+      showInstallHelp();
+      return;
+    }
     if (!config) return;
     setIsBusy(true);
     setMessage(null);
@@ -66,6 +74,10 @@ export default function NotificationSettings() {
         await refresh();
       }
     } catch (err) {
+      if (on && isIos()) {
+        showInstallHelp();
+        return;
+      }
       setMessage({ kind: "error", text: errorMessage(err, "Could not turn on notifications on this device.") });
     } finally {
       setIsBusy(false);

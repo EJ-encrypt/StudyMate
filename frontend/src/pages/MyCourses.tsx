@@ -24,7 +24,7 @@ export default function MyCourses() {
   const { user, refresh } = useAuth();
   const { courses, levels, current } = useCourseLevels();
   const [params, setParams] = useSearchParams();
-  const [adding, setAdding] = useState<{ semester: number } | null>(null);
+  const [adding, setAdding] = useState<{ semester: number; fixed: boolean } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,12 +75,12 @@ export default function MyCourses() {
             type="button"
             data-tour="courses-add"
             onClick={() => {
-              setAdding((open) => (open ? null : { semester: user?.semester ?? 1 }));
+              setAdding((open) => (open ? null : { semester: user?.semester ?? 1, fixed: false }));
               setIsImporting(false);
             }}
             className="btn-primary"
           >
-            <Plus className="h-4 w-4" aria-hidden /> Add courses
+            Add courses
           </button>
         </>
       }
@@ -122,6 +122,7 @@ export default function MyCourses() {
         <AddCoursesForm
           level={level}
           semester={adding.semester}
+          fixed={adding.fixed}
           onClose={() => setAdding(null)}
           onAdded={async (added, skipped, addedTo) => {
             setAdding(null);
@@ -160,8 +161,8 @@ export default function MyCourses() {
           title="No courses yet"
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" onClick={() => setAdding({ semester: user?.semester ?? 1 })} className="btn-primary">
-                <Plus className="h-4 w-4" aria-hidden /> Add your courses
+              <button type="button" onClick={() => setAdding({ semester: user?.semester ?? 1, fixed: false })} className="btn-primary">
+                Add your courses
               </button>
               <button type="button" onClick={() => setIsImporting(true)} className="btn-secondary">
                 <FileUp className="h-4 w-4" aria-hidden /> Import from a photo or PDF
@@ -206,18 +207,22 @@ export default function MyCourses() {
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="section-title mb-0">Semester {semester}</h3>
                   {list.length > 0 && (
-                    <button type="button" onClick={() => setAdding({ semester })} className="btn-ghost px-2 py-1 text-xs text-gold-dark">
-                      <Plus className="h-3.5 w-3.5" aria-hidden /> Add
+                    <button
+                      type="button"
+                      onClick={() => setAdding({ semester, fixed: true })}
+                      className="rounded-full border border-ink/15 bg-surface px-3.5 py-1 text-xs font-semibold text-ink shadow-sm transition hover:border-gold hover:bg-gold/10"
+                    >
+                      Add
                     </button>
                   )}
                 </div>
                 {list.length === 0 ? (
                   <button
                     type="button"
-                    onClick={() => setAdding({ semester })}
+                    onClick={() => setAdding({ semester, fixed: true })}
                     className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink/15 px-4 py-6 text-sm font-semibold text-ink/55 transition hover:border-gold/60 hover:bg-gold/5"
                   >
-                    <Plus className="h-4 w-4" aria-hidden /> Add Semester {semester} courses
+                    Add Semester {semester} courses
                   </button>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

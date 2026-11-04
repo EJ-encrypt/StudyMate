@@ -6,9 +6,11 @@ import AuthLayout from "../components/AuthLayout";
 import GoogleSignIn from "../components/GoogleSignIn";
 import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { isNetworkError, OFFLINE_MESSAGE } from "../lib/network";
 import { Captcha, captchaEnabled } from "../lib/captcha";
 
 function friendly(message: string): string {
+  if (isNetworkError(message)) return OFFLINE_MESSAGE;
   if (/email not confirmed/i.test(message)) {
     return "Please confirm your email first - check your inbox for the link we sent.";
   }

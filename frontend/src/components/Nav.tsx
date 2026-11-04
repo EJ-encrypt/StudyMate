@@ -69,8 +69,8 @@ function CoursesLink() {
   const [isOpen, setIsOpen] = useState(onCourses);
   const shownLevel = Number(params.get("level")) || current;
   // A level just started has no courses yet, but is listed while it is open.
-  const levels =
-    onCourses && !withCourses.includes(shownLevel) ? [...withCourses, shownLevel].sort((a, b) => a - b) : withCourses;
+  const known = withCourses.length > 0 ? withCourses : [current];
+  const levels = onCourses && !known.includes(shownLevel) ? [...known, shownLevel].sort((a, b) => a - b) : known;
 
   useEffect(() => {
     if (onCourses) setIsOpen(true);
@@ -78,39 +78,43 @@ function CoursesLink() {
 
   return (
     <div>
-      <div className="flex items-center">
-        <NavLink to="/courses" data-tour={COURSES.tour} className={({ isActive }) => `${sidebarLink(isActive)} flex-1`}>
-          <Library className="h-[18px] w-[18px] shrink-0" aria-hidden />
-          {COURSES.label}
-        </NavLink>
-        {levels.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setIsOpen((open) => !open)}
-            aria-expanded={isOpen}
-            aria-label={isOpen ? "Hide levels" : "Show levels"}
-            className="rounded-lg p-2 text-white/60 hover:bg-white/5 hover:text-white"
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden />
-          </button>
-        )}
-      </div>
-      {isOpen && levels.length > 0 && (
-        <ul className="mb-1 ml-6 mt-0.5 space-y-0.5 border-l border-white/10 pl-2" aria-label="Levels">
+      <button
+        type="button"
+        data-tour={COURSES.tour}
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        className={`${sidebarLink(onCourses)} w-full text-left`}
+      >
+        <Library className="h-[18px] w-[18px] shrink-0" aria-hidden />
+        <span className="flex-1">{COURSES.label}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 opacity-60 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {isOpen && (
+        <ul
+          className="mx-1 mb-1 mt-1 animate-fade-in space-y-0.5 overflow-hidden rounded-lg bg-white/5 p-1"
+          aria-label="Levels"
+        >
           {levels.map((level) => {
-            const active = pathname === "/courses" && shownLevel === level;
+            const active = onCourses && pathname === "/courses" && shownLevel === level;
             return (
               <li key={level}>
                 <Link
                   to={`/courses?level=${level}`}
                   aria-current={active ? "page" : undefined}
                   className={[
-                    "block rounded-md px-3 py-1.5 text-sm transition",
-                    active ? "bg-white/10 font-semibold text-gold" : "text-white/60 hover:bg-white/5 hover:text-white",
+                    "flex items-center justify-between rounded-md px-3 py-2 text-sm transition",
+                    active ? "bg-white/10 font-semibold text-gold" : "text-white/70 hover:bg-white/5 hover:text-white",
                   ].join(" ")}
                 >
                   Level {level}
-                  {level === current && <span className="ml-1.5 text-xs font-normal text-white/40">now</span>}
+                  {level === current && (
+                    <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                      Now
+                    </span>
+                  )}
                 </Link>
               </li>
             );

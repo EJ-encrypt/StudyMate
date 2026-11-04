@@ -6,6 +6,7 @@ import AuthLayout from "../components/AuthLayout";
 import GoogleSignIn from "../components/GoogleSignIn";
 import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { isNetworkError, OFFLINE_MESSAGE } from "../lib/network";
 import { Captcha, captchaEnabled } from "../lib/captcha";
 
 export default function Register() {
@@ -36,7 +37,11 @@ export default function Register() {
     } catch (err) {
       const message = (err as Error).message;
       setError(
-        /already registered/i.test(message) ? "That email already has an account. Try logging in." : message,
+        isNetworkError(err)
+          ? OFFLINE_MESSAGE
+          : /already registered/i.test(message)
+            ? "That email already has an account. Try logging in."
+            : message,
       );
       setCaptchaRound((round) => round + 1);
     } finally {

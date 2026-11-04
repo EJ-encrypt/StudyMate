@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,8 +27,10 @@ describe("Navigation", () => {
       </MemoryRouter>,
     );
     for (const item of NAV_ITEMS) {
-      const link = screen.getByRole("link", { name: new RegExp(`^${item.label}`) });
-      expect(link.querySelector("svg")).not.toBeNull();
+      // My Courses opens a list of levels rather than going anywhere itself.
+      const role = item.label === "My Courses" ? "button" : "link";
+      const entry = screen.getByRole(role, { name: new RegExp(`^${item.label}`) });
+      expect(entry.querySelector("svg")).not.toBeNull();
     }
     expect(screen.getByRole("link", { name: "Arcade" }).className).toContain("text-gold");
     expect(container).toHaveTextContent("Ama Mensah");
@@ -55,12 +57,14 @@ describe("Navigation", () => {
     expect(await screen.findByRole("link", { name: /Leaderboard\s*1,240 XP/ })).toHaveAttribute("href", "/friends");
   });
 
-  it("opens My Courses to every level, earlier ones included", async () => {
+  it("drops My Courses down to every level, earlier ones included", async () => {
     render(
-      <MemoryRouter initialEntries={["/courses"]}>
+      <MemoryRouter initialEntries={["/play"]}>
         <Sidebar />
       </MemoryRouter>,
     );
+    expect(screen.queryByRole("list", { name: "Levels" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /My Courses/ }));
     const levels = await screen.findByRole("list", { name: "Levels" });
     expect(within(levels).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
       "/courses?level=100",

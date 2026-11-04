@@ -26,19 +26,19 @@ export const TOUR_STEPS: TourStep[] = [
     path: "/courses",
     target: "nav-courses",
     title: "My Courses",
-    body: "Your courses, one level at a time, Semester 1 then Semester 2. When you move up a level, earlier levels and everything in them stay here. On a computer, open the arrow beside My Courses to switch level; on a phone, use the level chips at the top.",
+    body: "Your courses, one level at a time, Semester 1 then Semester 2. When you move up a level, earlier levels and everything in them stay here. On a computer, click My Courses to drop down your levels and pick one; on a phone, use the level chips at the top of the page.",
   },
   {
     path: "/courses",
     target: "courses-add",
     title: "Add your courses",
-    body: "Tap Add courses, choose the level and semester, and type in as many courses as you like before saving. Or use Import from file to read them from a photo or PDF of your registration slip.",
+    body: "Add courses lets you choose a level and semester, then type in as many courses as you like and save them together. The Add button on a semester skips that choice and adds straight into it. Import from file reads them from a photo or PDF of your registration slip.",
   },
   {
     path: "/courses",
     target: "courses-semester",
-    title: "Add your material",
-    body: "Open a course to give StudyMate something to work with: upload slides, PDFs or Word files, type notes, or photograph the pages of your notebook. It reads them, handwriting included, in a minute or two. You can delete a course at the bottom of its page.",
+    title: "Add material, or delete a course",
+    body: "Open a course to give StudyMate something to work with: upload slides, PDFs or Word files, type notes, or photograph the pages of your notebook. It reads them, handwriting included, in a minute or two. To delete a course, open it, scroll to the bottom and tap Delete this course; its files, questions and scores go with it.",
   },
   {
     path: "/study",
@@ -80,7 +80,7 @@ export const TOUR_STEPS: TourStep[] = [
     path: "/settings",
     target: "nav-settings",
     title: "Settings",
-    body: "Your progress and badges, daily goal, profile and level, password, privacy, reminders, permissions and dark mode. On an iPhone, add StudyMate to your Home Screen (Share, then Add to Home Screen) so reminders can reach you.",
+    body: "Tap any row to open it: Progress & badges, Daily goal, Profile (your name, username and level), Password, Privacy, Lecture reminders, Permissions and Appearance. Log out and Delete account are at the bottom. On an iPhone, notifications need StudyMate on your Home Screen; Permissions shows you how.",
   },
   {
     path: "/settings",

@@ -1,7 +1,8 @@
-import { BellRing, Brain, Gamepad2, GraduationCap } from "lucide-react";
-import { ReactNode } from "react";
+import { BellRing, Brain, Gamepad2, GraduationCap, RotateCw, WifiOff } from "lucide-react";
+import { ReactNode, useState } from "react";
 
 import { useAuth } from "../context/AuthContext";
+import { useOnline } from "../lib/network";
 import { Alert } from "./ui";
 import { CoachIcon } from "../lib/icons";
 
@@ -11,6 +12,38 @@ const FEATURES = [
   { icon: BellRing, text: "Reminders before every lecture, and a nudge to capture what you learnt" },
   { icon: CoachIcon, text: "A coach that tracks every topic and tells you what to revise next" },
 ];
+
+/** Shown instead of the form while the device has no connection: signing in cannot work. */
+function OfflineNotice() {
+  const [isChecking, setIsChecking] = useState(false);
+
+  function check() {
+    setIsChecking(true);
+    // The page updates by itself when the connection returns; this is for
+    // people who would rather tap something than wait.
+    window.setTimeout(() => {
+      setIsChecking(false);
+      if (navigator.onLine) window.location.reload();
+    }, 800);
+  }
+
+  return (
+    <div className="card flex flex-col items-center p-8 text-center" role="alert">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <WifiOff className="h-7 w-7" aria-hidden />
+      </span>
+      <h2 className="mt-4 text-lg font-bold text-ink">You're offline</h2>
+      <p className="mt-1 text-sm text-ink/65">
+        StudyMate needs the internet to sign you in. Turn on Wi-Fi or mobile data, or move somewhere with a better
+        signal. This page carries on by itself once you're connected.
+      </p>
+      <button type="button" onClick={check} disabled={isChecking} className="btn-primary mt-5">
+        <RotateCw className={`h-4 w-4 ${isChecking ? "animate-spin" : ""}`} aria-hidden />
+        {isChecking ? "Checking..." : "Try again"}
+      </button>
+    </div>
+  );
+}
 
 /** Split layout for the signed-out pages: product pitch beside the form. */
 export default function AuthLayout({
@@ -23,6 +56,7 @@ export default function AuthLayout({
   children: ReactNode;
 }) {
   const { isConfigured } = useAuth();
+  const online = useOnline();
 
   return (
     <div className="flex min-h-screen">
@@ -59,8 +93,8 @@ export default function AuthLayout({
             </span>
             StudyMate
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-ink/60">{subtitle}</p>}
+          {online && <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>}
+          {online && subtitle && <p className="mt-1 text-sm text-ink/60">{subtitle}</p>}
           {!isConfigured && (
             <div className="mt-4">
               <Alert>
@@ -69,7 +103,7 @@ export default function AuthLayout({
               </Alert>
             </div>
           )}
-          <div className="mt-6">{children}</div>
+          <div className="mt-6">{online ? children : <OfflineNotice />}</div>
         </div>
       </section>
     </div>

@@ -36,6 +36,7 @@ import NotificationSettings from "../components/NotificationSettings";
 import PageHeader from "../components/PageHeader";
 import { Alert, EmptyState, ListSkeleton } from "../components/ui";
 import { enablePush, getNotificationConfig, pushState } from "../lib/push";
+import { showInstallHelp } from "../lib/installHelp";
 import { toast, undoable } from "../lib/toast";
 
 const BLANK: SlotInput = {
@@ -208,6 +209,14 @@ export default function Schedule() {
    */
   async function offerReminders(saved: string) {
     const state = await pushState().catch(() => "unsupported" as const);
+    if (state === "needs-install") {
+      toast(`${saved} Want a reminder before each lecture?`, {
+        kind: "info",
+        duration: 10000,
+        action: { label: "How", onClick: showInstallHelp },
+      });
+      return;
+    }
     if (state !== "off") {
       toast(saved);
       return;

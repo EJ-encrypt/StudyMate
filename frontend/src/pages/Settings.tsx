@@ -26,6 +26,7 @@ import { BlockedStudent, getProgrammes, listBlocked, unblockStudent } from "../a
 import NotificationSettings from "../components/NotificationSettings";
 import { Alert, PasswordInput } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { showInstallHelp } from "../lib/installHelp";
 import { enablePush, getNotificationConfig, isIos, pushState, PushState } from "../lib/push";
 import { Captcha, captchaEnabled } from "../lib/captcha";
 import { getThemeChoice, setThemeChoice, ThemeChoice } from "../lib/theme";
@@ -553,6 +554,11 @@ function Permissions() {
           {state === "off" && (
             <button type="button" onClick={() => void allow()} disabled={isBusy} className="btn-secondary mt-2 py-1.5">
               Allow notifications
+            </button>
+          )}
+          {state === "needs-install" && (
+            <button type="button" onClick={showInstallHelp} className="btn-secondary mt-2 py-1.5">
+              Show me how
             </button>
           )}
         </div>
